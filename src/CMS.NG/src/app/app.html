@@ -1,0 +1,57 @@
+<div class="layout" [class.collapsed]="collapsed()">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-text">UWA</span>
+      <button type="button" class="brand-toggle" (click)="toggleCollapsed()" aria-label="收合選單">
+        <i class="pi" [class.pi-angle-left]="!collapsed()" [class.pi-angle-right]="collapsed()"></i>
+      </button>
+    </div>
+
+    <nav class="nav">
+      @for (group of groups(); track group.label) {
+        <div class="nav-group">
+          <button type="button" class="nav-group-header" (click)="toggleGroup(group)">
+            <i class="nav-icon" [class]="group.icon"></i>
+            <span class="nav-label">{{ group.label }}</span>
+            <i
+              class="nav-caret pi"
+              [class.pi-angle-down]="group.expanded"
+              [class.pi-angle-right]="!group.expanded"
+            ></i>
+          </button>
+
+          @if (group.expanded && group.items.length) {
+            <div class="nav-items">
+              @for (item of group.items; track item.label) {
+                @if (item.route) {
+                  <a
+                    class="nav-item"
+                    [routerLink]="item.route"
+                    routerLinkActive="active"
+                  >
+                    <i class="nav-icon" [class]="item.icon"></i>
+                    <span class="nav-label">{{ item.label }}</span>
+                  </a>
+                } @else {
+                  <span class="nav-item disabled">
+                    <i class="nav-icon" [class]="item.icon"></i>
+                    <span class="nav-label">{{ item.label }}</span>
+                  </span>
+                }
+              }
+            </div>
+          }
+        </div>
+      }
+    </nav>
+  </aside>
+
+  <!-- Main content -->
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>
+
+<p-toast />
+<p-confirmdialog />

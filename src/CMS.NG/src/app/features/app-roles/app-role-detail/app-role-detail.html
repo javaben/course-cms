@@ -1,0 +1,57 @@
+<div class="page">
+  <!-- Header -->
+  <div class="page-header">
+    <h1 class="title">檢視角色</h1>
+    <div class="actions">
+      <button type="button" pButton class="p-button-outlined" icon="pi pi-arrow-left" label="返回" (click)="back()"></button>
+      <button type="button" pButton class="p-button-success" icon="pi pi-pencil" label="編輯" (click)="edit()"></button>
+    </div>
+  </div>
+
+  @if (role(); as r) {
+    <!-- Role data -->
+    <div class="card">
+      <h2 class="card-title">角色資料</h2>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">主代碼</span>
+          <span class="detail-value">{{ r.pkid }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">角色代碼</span>
+          <span class="detail-value">{{ r.roleId }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">角色名稱</span>
+          <span class="detail-value">{{ r.roleName }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">權限等級</span>
+          <span class="detail-value">{{ r.permissionLevel }}</span>
+        </div>
+        <div class="detail-item full">
+          <span class="detail-label">描述</span>
+          <span class="detail-value">{{ r.description || '—' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users -->
+    <div class="card">
+      <h2 class="card-title">使用者（{{ r.userCount }}）</h2>
+      @if (userLabels().length) {
+        <div class="chips">
+          @for (label of userLabels(); track label) {
+            <p-tag [value]="label" severity="info" />
+          }
+        </div>
+      } @else {
+        <span class="text-muted">尚未指派使用者</span>
+      }
+    </div>
+  } @else if (!loading()) {
+    <div class="card">
+      <span class="text-muted">查無此角色。</span>
+    </div>
+  }
+</div>
