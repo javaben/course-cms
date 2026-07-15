@@ -1,0 +1,34 @@
+.qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.qr-img {
+  width: 180px;
+  height: 180px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.qr-placeholder {
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-size: 3rem;
+}
+
+.qr-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #1e293b;
+  word-break: break-all;
+  text-align: center;
+}

@@ -9,7 +9,10 @@
 
   ### Repository
   - `I{TABLE}Repository.cs` + `{TABLE}Repository.cs`
-  - Dapper only (no EF). Multi-map when JOINing nav objects.
+  - Dapper only (no EF). Multi-map when JOINing FK nav objects: alias each nav's leading column
+    `AS Pkid` and pass `splitOn: "Pkid,Pkid,..."` (one entry per nav) — the repeated split name maps
+    each nav's own pkid and Dapper hands back a null nav when a LEFT-JOINed key is null. First used by
+    Course (Partner + CourseGroup + PublishStatus).
   - `nchar` columns: always `RTRIM()` in SQL
   - n-n: delete-then-reinsert on update; separate query on same connection for read
 
@@ -32,6 +35,13 @@
   ### List page
   - Session storage keys: `{table}-list-filters`, `{table}-list-sort`, `{table}-list-page`
   - Sortable/paginated `p-table`; filter drawer (`p-drawer`)
+  - **Inline cell-editing** (opt-in; first used by Course): PrimeNG editors in the `p-table` body,
+    activated by `(dblclick)` **only** (single-click must not edit). Bind one shared `editValue` +
+    an `editing` signal `{ pkid, field }`; commit on the editor's blur/change. Validate client-side
+    first (required non-empty, numbers ≥ 0, valid dates, cross-field rules) — on failure show an
+    inline error and **stay in edit mode**; on success fetch the full record (`getById`) to preserve
+    N-N lists, apply the one field, PUT, and **revert on server error** (don't mutate the row until
+    the save resolves). Read-only columns (PK, FK-label columns) simply omit the `(dblclick)` editor.
   - `p-select` in drawer: always `appendTo="body"`; mapped `{ pkid, label }[]` getter; `[filter]="true"` for 10+ options
   - `p-select` / `p-multiselect` with 100+ items: add `[virtualScroll]="true" [virtualScrollItemSize]="43"`
 
@@ -43,6 +53,12 @@
 
   ### Sidebar nav
   - Add entry under the appropriate nav group in `app.html` / `app.ts`
+
+  ### QR code (opt-in; first used by Course detail)
+  - Standalone component (`<app-{table}-qr-code [pkid] [id]>`) rendered inside a detail card.
+  - Generate a **PNG data URL** with the `qrcode` package (`QRCode.toDataURL(url)`); display via
+    `<img [src]>`, download by synthesizing an `<a download>` — no server round-trip.
+  - `qrcode` is CommonJS → add it to `angular.json` `allowedCommonJsDependencies`.
   
  
   ## Special Types

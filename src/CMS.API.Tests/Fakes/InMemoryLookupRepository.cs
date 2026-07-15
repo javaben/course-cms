@@ -12,6 +12,8 @@ public sealed class InMemoryLookupRepository : ILookupRepository
 {
     private readonly List<TrainingCenterLookup> _trainingCenters = [];
     private readonly List<PromotionLookup> _promotions = [];
+    private readonly List<CertificationLookup> _certifications = [];
+    private readonly List<JobCategoryLookup> _jobCategories = [];
 
     public InMemoryLookupRepository SeedTrainingCenters(params TrainingCenterLookup[] rows)
     {
@@ -25,6 +27,18 @@ public sealed class InMemoryLookupRepository : ILookupRepository
         return this;
     }
 
+    public InMemoryLookupRepository SeedCertifications(params CertificationLookup[] rows)
+    {
+        _certifications.AddRange(rows);
+        return this;
+    }
+
+    public InMemoryLookupRepository SeedJobCategories(params JobCategoryLookup[] rows)
+    {
+        _jobCategories.AddRange(rows);
+        return this;
+    }
+
     public Task<IReadOnlyList<TrainingCenterLookup>> GetTrainingCentersAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<TrainingCenterLookup>>(
             _trainingCenters.OrderBy(t => t.Pkid).ToList());
@@ -32,6 +46,14 @@ public sealed class InMemoryLookupRepository : ILookupRepository
     public Task<PromotionLookup?> GetPromotionByCodeAsync(string promoCode, CancellationToken ct = default)
         => Task.FromResult(_promotions.FirstOrDefault(p =>
             string.Equals(p.PromoCode, promoCode, StringComparison.OrdinalIgnoreCase)));
+
+    public Task<IReadOnlyList<CertificationLookup>> GetCertificationsAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<CertificationLookup>>(
+            _certifications.OrderBy(c => c.Label, StringComparer.Ordinal).ToList());
+
+    public Task<IReadOnlyList<JobCategoryLookup>> GetJobCategoriesAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<JobCategoryLookup>>(
+            _jobCategories.OrderBy(j => j.Description, StringComparer.Ordinal).ToList());
 
     // --- Unused by these tests -------------------------------------------
     public Task<IReadOnlyList<AppUserLookup>> GetAppUsersAsync(CancellationToken ct = default)

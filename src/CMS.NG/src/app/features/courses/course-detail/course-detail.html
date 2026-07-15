@@ -1,0 +1,172 @@
+<div class="page">
+  <!-- Header -->
+  <div class="page-header">
+    <h1 class="title">檢視課程</h1>
+    <div class="actions">
+      <button type="button" pButton class="p-button-outlined" icon="pi pi-arrow-left" label="返回" (click)="back()"></button>
+      <button type="button" pButton class="p-button-success" icon="pi pi-pencil" label="編輯" (click)="edit()"></button>
+    </div>
+  </div>
+
+  @if (course(); as c) {
+    <!-- 基本資料 + QR code -->
+    <div class="card">
+      <h2 class="card-title">基本資料</h2>
+      <div class="basic-layout">
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">主代碼</span>
+            <span class="detail-value">{{ c.pkid }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">顯示順序</span>
+            <span class="detail-value">{{ c.displayOrder }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">簡介代碼</span>
+            <span class="detail-value">{{ c.courseId }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">科目代碼</span>
+            <span class="detail-value">{{ c.prodCourseId }}</span>
+          </div>
+          <div class="detail-item full">
+            <span class="detail-label">課程名稱</span>
+            <span class="detail-value">{{ c.title }}</span>
+          </div>
+          <div class="detail-item full">
+            <span class="detail-label">官方課程名稱</span>
+            <span class="detail-value">{{ c.officialTitle || '—' }}</span>
+          </div>
+          <div class="detail-item full">
+            <span class="detail-label">友善網址</span>
+            <span class="detail-value">{{ c.friendlyUrl }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">原廠</span>
+            <span class="detail-value">
+              <a class="link" [routerLink]="['/partners', c.partnerPkid]">{{ c.partner?.label || c.partnerPkid }}</a>
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">課程群組</span>
+            <span class="detail-value">
+              @if (c.courseGroupPkid != null) {
+                <a class="link" [routerLink]="['/course-groups', c.courseGroupPkid]">{{ c.courseGroup?.label || c.courseGroupPkid }}</a>
+              } @else {
+                —
+              }
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">上架狀態</span>
+            <span class="detail-value">
+              <a class="link" [routerLink]="['/publish-statuses', c.publishStatusPkid]">{{ c.publishStatus?.label || c.publishStatusPkid }}</a>
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">允許重聽</span>
+            <span class="detail-value">
+              <p-tag [value]="c.canRepeat ? '是' : '否'" [severity]="c.canRepeat ? 'success' : 'secondary'" />
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">上架日期</span>
+            <span class="detail-value">{{ c.scheduleOn }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">下架日期</span>
+            <span class="detail-value">{{ c.scheduleOff }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">時數</span>
+            <span class="detail-value">{{ c.hour }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">定價</span>
+            <span class="detail-value">{{ c.listPrice }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">點數</span>
+            <span class="detail-value">{{ c.learningCredit }}</span>
+          </div>
+        </div>
+
+        <!-- QR code -->
+        <div class="qr-panel">
+          <app-course-qr-code [pkid]="c.pkid" [courseId]="c.courseId" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 課程內容 -->
+    <div class="card">
+      <h2 class="card-title">課程內容</h2>
+      <div class="detail-grid">
+        <div class="detail-item full">
+          <span class="detail-label">教材</span>
+          <span class="detail-value pre">{{ c.material || '—' }}</span>
+        </div>
+        <div class="detail-item full">
+          <span class="detail-label">課程目標</span>
+          <span class="detail-value pre">{{ c.objective || '—' }}</span>
+        </div>
+        <div class="detail-item full">
+          <span class="detail-label">適合對象</span>
+          <span class="detail-value pre">{{ c.target || '—' }}</span>
+        </div>
+        <div class="detail-item full">
+          <span class="detail-label">先備知識</span>
+          <span class="detail-value pre">{{ c.prerequisites || '—' }}</span>
+        </div>
+        <div class="detail-item full">
+          <span class="detail-label">課程大綱</span>
+          <span class="detail-value pre">{{ c.outline || '—' }}</span>
+        </div>
+        <div class="detail-item full">
+          <span class="detail-label">考試／認證說明</span>
+          <span class="detail-value pre">{{ c.towardCertOrExam || '—' }}</span>
+        </div>
+        <div class="detail-item full">
+          <span class="detail-label">備註</span>
+          <span class="detail-value pre">{{ c.note || '—' }}</span>
+        </div>
+        <div class="detail-item full">
+          <span class="detail-label">其他資訊</span>
+          <span class="detail-value pre">{{ c.otherInfo || '—' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- N-N -->
+    <div class="card">
+      <h2 class="card-title">對應認證（{{ certificationLabels().length }}）</h2>
+      @if (certificationLabels().length) {
+        <div class="chips">
+          @for (label of certificationLabels(); track label) {
+            <p-tag [value]="label" severity="info" />
+          }
+        </div>
+      } @else {
+        <span class="text-muted">尚未指派認證</span>
+      }
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">對應職務類別（{{ jobCategoryLabels().length }}）</h2>
+      @if (jobCategoryLabels().length) {
+        <div class="chips">
+          @for (label of jobCategoryLabels(); track label) {
+            <p-tag [value]="label" severity="warn" />
+          }
+        </div>
+      } @else {
+        <span class="text-muted">尚未指派職務類別</span>
+      }
+    </div>
+  } @else if (!loading()) {
+    <div class="card">
+      <span class="text-muted">查無此課程。</span>
+    </div>
+  }
+</div>

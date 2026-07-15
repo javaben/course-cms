@@ -88,4 +88,29 @@ public sealed class LookupRepository : ILookupRepository
               WHERE PromoCode = @PromoCode",
             new { PromoCode = promoCode }, cancellationToken: ct));
     }
+
+    public async Task<IReadOnlyList<CertificationLookup>> GetCertificationsAsync(CancellationToken ct = default)
+    {
+        using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        // Certification.Title is nchar(100) → RTRIM; label prefixed with the owning Partner's name.
+        var rows = await conn.QueryAsync<CertificationLookup>(new CommandDefinition(
+            @"SELECT c.pkid AS Pkid,
+                     p.Name + ' - ' + RTRIM(c.Title) AS Label
+              FROM Certification c
+              JOIN Partner p ON p.pkid = c.Partner_pkid
+              ORDER BY p.Name ASC, c.Title ASC",
+            cancellationToken: ct));
+        return rows.AsList();
+    }
+
+    public async Task<IReadOnlyList<JobCategoryLookup>> GetJobCategoriesAsync(CancellationToken ct = default)
+    {
+        using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        var rows = await conn.QueryAsync<JobCategoryLookup>(new CommandDefinition(
+            @"SELECT pkid AS Pkid, Description AS Description
+              FROM JobCategory
+              ORDER BY Description ASC",
+            cancellationToken: ct));
+        return rows.AsList();
+    }
 }

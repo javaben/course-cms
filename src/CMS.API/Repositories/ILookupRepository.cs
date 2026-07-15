@@ -24,4 +24,10 @@ public interface ILookupRepository
 
     /// <summary>Resolve a Promotion2 by its (unique) PromoCode for the FeaturedPromoItem edit form. Null if not found.</summary>
     Task<PromotionLookup?> GetPromotionByCodeAsync(string promoCode, CancellationToken ct = default);
+
+    /// <summary>Certification lookup rows for the Course ↔ Certification n-n picker (label = Partner.Name - Title).</summary>
+    Task<IReadOnlyList<CertificationLookup>> GetCertificationsAsync(CancellationToken ct = default);
+
+    /// <summary>JobCategory lookup rows for the Course ↔ JobCategory n-n picker (ordered by Description).</summary>
+    Task<IReadOnlyList<JobCategoryLookup>> GetJobCategoriesAsync(CancellationToken ct = default);
 }

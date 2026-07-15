@@ -1,0 +1,111 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.title-block {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0;
+  color: #1e293b;
+}
+
+.subtitle {
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 1.25rem;
+  color: #334155;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1.25rem;
+}
+
+.card > .field:last-child {
+  margin-bottom: 0;
+}
+
+.grid-2 .field {
+  margin-bottom: 0;
+}
+
+.field.span-2 {
+  grid-column: 1 / -1;
+}
+
+.field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.field label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+.req {
+  color: #ef4444;
+}
+
+.error {
+  color: #ef4444;
+  font-size: 0.8rem;
+}
+
+:host ::ng-deep .p-inputtext,
+:host ::ng-deep .p-inputnumber,
+:host ::ng-deep .p-select,
+:host ::ng-deep .p-multiselect,
+:host ::ng-deep .p-datepicker,
+:host ::ng-deep textarea.p-inputtext,
+:host ::ng-deep .w-full {
+  width: 100%;
+}

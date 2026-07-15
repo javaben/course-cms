@@ -52,4 +52,14 @@ public class LookupsController : ControllerBase
         var promo = await _repository.GetPromotionByCodeAsync(code, ct);
         return promo is null ? NotFound() : Ok(promo);
     }
+
+    /// <summary>Certification lookup list for the Course ↔ Certification n-n picker.</summary>
+    [HttpGet("certifications")]
+    public async Task<ActionResult<IReadOnlyList<CertificationLookup>>> GetCertifications(CancellationToken ct)
+        => Ok(await _repository.GetCertificationsAsync(ct));
+
+    /// <summary>JobCategory lookup list for the Course ↔ JobCategory n-n picker.</summary>
+    [HttpGet("job-categories")]
+    public async Task<ActionResult<IReadOnlyList<JobCategoryLookup>>> GetJobCategories(CancellationToken ct)
+        => Ok(await _repository.GetJobCategoriesAsync(ct));
 }

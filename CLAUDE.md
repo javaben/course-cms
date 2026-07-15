@@ -25,7 +25,8 @@ endpoints can be smoke-tested with real data (it holds production-like rows — 
 - **`docs/architecture.md`** — three-layer backend flow, the three PK shapes, n-n handling, routes,
   tests, and Angular/PrimeNG frontend layout. Read when generating a table or changing the layering.
 - **`docs/features.md`** — the implemented features (AppRole, AppUser, PublishStatus, Partner,
-  CourseGroup) and the AppUser password-handling convention.
+  CourseGroup, Course, FeaturedPromoItem), the AppUser password-handling convention, and the Course
+  FK-multi-map / N-N / QR-code / inline-list-edit patterns.
 
 ## Commands
 
