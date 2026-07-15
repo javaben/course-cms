@@ -17,6 +17,11 @@
   - n-n: delete-then-reinsert on update; separate query on same connection for read
 
   ### Controller
+  - **Auth (app-wide, since the Auth feature):** a global fallback authorization policy in `Program.cs`
+    requires an authenticated user on **every** endpoint. Generated controllers need **no** `[Authorize]`
+    attribute — they are protected automatically. Only add `[AllowAnonymous]` (per-action) for endpoints
+    that must be public. The Angular services need no change: the HTTP interceptor attaches the bearer
+    token to every request. (Full detail in `docs/features.md` → Auth.)
   - Route: `/api/{tablePlural}`; `PUT` takes pkid from body (no route param)
   - String PKs: route `{id}` (no `:int` constraint); service uses `encodeURIComponent`
   - `date`/`time` columns: use C# `DateOnly`/`TimeOnly`. Dapper 2.1.66 reads them fine but **cannot

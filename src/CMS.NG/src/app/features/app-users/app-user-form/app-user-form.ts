@@ -12,6 +12,7 @@ import { MultiSelectModule } from 'primeng/multiselect';
 import { ConfirmationService, MessageService } from 'primeng/api';
 
 import { AppUserService } from '@core/services/app-user.service';
+import { AuthService } from '@core/services/auth.service';
 import { LookupService } from '@core/services/lookup.service';
 import { AppUser, AppUserRequest } from '@core/models/app-user.model';
 import { AppRoleLookup } from '@core/models/app-role-lookup.model';
@@ -35,9 +36,13 @@ export class AppUserForm implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly service = inject(AppUserService);
+  private readonly auth = inject(AuthService);
   private readonly lookups = inject(LookupService);
   private readonly confirmation = inject(ConfirmationService);
   private readonly messages = inject(MessageService);
+
+  /** Reset-to-default is Admin-only (the backend enforces it too). */
+  readonly isAdmin = this.auth.isAdmin;
 
   readonly isEdit = signal(false);
   readonly loading = signal(true);
@@ -131,7 +136,8 @@ export class AppUserForm implements OnInit {
       acceptLabel: '重設',
       rejectLabel: '取消',
       accept: () => {
-        this.service.resetPassword(id).subscribe({
+        // Admin-only endpoint; the client sends only the UserId (never a password/hash).
+        this.auth.resetPasswordToDefault(id).subscribe({
           next: () => {
             this.messages.add({ severity: 'success', summary: '已重設', detail: '密碼已重設為預設密碼。' });
             this.service.getById(id).subscribe((u) => this.passwordUpdatedTime.set(u.passwordUpdatedTime ?? null));

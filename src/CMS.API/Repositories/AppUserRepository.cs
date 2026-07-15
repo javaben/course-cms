@@ -1,6 +1,4 @@
 using System.Data;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using CMS.API.Infrastructure;
 using CMS.API.Models;
@@ -217,10 +215,6 @@ public sealed class AppUserRepository : IAppUserRepository
         if (string.IsNullOrEmpty(defaultPassword))
             throw new InvalidOperationException("appConfig.defaultPassword 未設定。");
 
-        return Sha256Hex(defaultPassword);
+        return PasswordHasher.Sha256Hex(defaultPassword);
     }
-
-    /// <summary>SHA-256 → lowercase hex (64 chars, fits nvarchar(800)).</summary>
-    private static string Sha256Hex(string value)
-        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 }

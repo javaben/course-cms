@@ -15,6 +15,11 @@ Strict three-layer flow, no Entity Framework — **Dapper only**:
 - `Program.cs` registers repositories (scoped), the connection factory (singleton), Swagger, and a
   CORS policy allowing any loopback origin. JSON is default camelCase — C# `PascalCase` becomes
   frontend `camelCase`, including computed getters like `AppUserLookup.Label`.
+- **Auth/authorization** (see `docs/features.md` → Auth): JWT bearer, `UseAuthentication()` before
+  `UseAuthorization()`, and a **fallback policy** requiring an authenticated user on every endpoint
+  except those marked `[AllowAnonymous]` (only `AuthController.Login`). The signing key comes from
+  `ISigningKeyProvider` (singleton, reads `SysConfig['appConfig'].symmetricSecurityKey`) and is used
+  for both issuing and validation.
 
 ### The three PK shapes
 
@@ -46,7 +51,10 @@ Standard route shape per table: `GET /api/{plural}`, `POST /api/{plural}/query` 
 
 `CMS.API.Tests` exercise **controllers against an in-memory fake repository**
 (`Fakes/InMemory*Repository.cs`) — no database needed. The fake must mirror the SQL behaviour
-(filtering, n-n sync, ordering) so tests stay meaningful.
+(filtering, n-n sync, ordering) so tests stay meaningful. The one exception is `AuthorizationTests`,
+which runs the **full middleware pipeline** via `WebApplicationFactory<Program>` +
+`ConfigureTestServices` (swapping the signing-key provider and the touched repos for fakes) to prove
+the JWT bearer + fallback-policy behaviour end-to-end.
 
 ## Frontend (`CMS.NG`)
 

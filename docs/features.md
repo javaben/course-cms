@@ -12,6 +12,7 @@ Use **AppRole** as the reference implementation.
 | CourseGroup | 課程群組 | 課程管理 Course | `smallint` IDENTITY PK | minimal single-column case |
 | Course | 課程 | 課程管理 Course | `int` IDENTITY PK | **first FK multi-map + N-N feature**; QR code on detail; **inline cell-editing on the list**; see below |
 | FeaturedPromoItem | 上稿作業 | 首頁管理 Home | `int` IDENTITY PK | **custom board** (not the triad); FKs to TrainingCenter + Promotion2; see below |
+| Auth | 登入/個人資料 | — | n/a (no table) | JWT login + **global bearer authorization** + self-profile update; frontend login/guard/interceptor/role-gated menu; see below |
 
 ## AppUser password handling
 
@@ -23,10 +24,104 @@ A convention **not yet in `spec/code-gen.convention.md`** — flag when generali
   object), extracts `defaultPassword`, SHA-256 hashes it to **lowercase hex**, and stores it (with
   `PasswordUpdatedTime = UtcNow`).
 - **Update** never touches the hash.
-- `POST /api/app-users/{id}/reset-password` re-hashes the default and bumps `PasswordUpdatedTime` —
-  the only update path that changes the hash (`重設密碼` button in the detail/edit views).
+- `POST /api/app-users/{id}/reset-password` re-hashes the default and bumps `PasswordUpdatedTime`.
+  **The AppUser *edit form's* reset button now calls the Admin-gated `POST /api/Auth/reset-password`
+  instead** (visible only to Admins; see the Auth feature). Password hashes also change via the Auth
+  self-service `POST /api/Auth/change-password`.
 - `PasswordUpdatedTime` is `datetime` NULL, read-only, displayed with the `+ 'Z'` UTC fix.
 - The `app-roles` lookup (`GET /api/lookups/app-roles`) feeds the AppUser role picker.
+
+## Auth / Login (登入)
+
+A **non-CRUD** feature — no table, no triad. `AuthController` uses `[controller]` → `api/Auth` (the one
+controller that isn't a lowercase-plural route) and hosts login, JWT issuing, self-profile update,
+change-password, and Admin reset-password. **Full spec: `spec/auth.md`.**
+
+### Login + JWT issuing — `POST /api/Auth/login`
+
+Takes `{ userId, password }`, returns `{ userId, userName, accessToken }` (a `LoginResponse`). Marked
+`[AllowAnonymous]` (per-action, not on the class — see authorization below).
+
+- **Credential check** (`AuthRepository.FindByUserIdAsync`, Dapper): UserId match **and** `IsActive = 1`
+  **and** `PasswordHash == SHA256(password)` as lowercase hex. Any failure returns a single generic
+  `401 { message: "invalid credentials" }` — the controller evaluates all three then collapses to one
+  result so the caller can't tell which failed. `PasswordHash` is read only inside `AuthUser` (a
+  server-side credential model) and never serialized — `LoginResponse` has no hash field.
+- **Password hashing** is shared: `Infrastructure/PasswordHasher.Sha256Hex` is the single source of truth,
+  used by both `AuthController` (verify) and `AppUserRepository` (create/reset) so a password set by one
+  verifies under the other.
+- **JWT** (`System.IdentityModel.Tokens.Jwt`, HMAC-SHA256): the signing secret is `SysConfig['appConfig']
+  .symmetricSecurityKey`, read at runtime — never hard-coded — via `Infrastructure/SigningKeyProvider`
+  (`ISigningKeyProvider`, singleton, caches after first DB read). The **same provider** signs (issue) and
+  validates (bearer), so a token this app mints is a token it accepts. Claims: `sub`/`userId` = UserId,
+  `userName` = UserName, and one **`role`** claim per RoleId from `AppUserRole` (short claim name, decoded
+  client-side; `RoleClaimType`/`NameClaimType` set on validation). 24h lifetime
+  (`AuthController.TokenLifetime`). Built via the `JwtSecurityToken` constructor so claim types are
+  verbatim (no in/outbound remapping; `MapInboundClaims = false`).
+
+### Authorization (global) — secure by default
+
+`Program.cs` wires `AddAuthentication().AddJwtBearer()` (options bound to `ISigningKeyProvider` via
+`Configure<ISigningKeyProvider>` so the key is resolved from DI at runtime) + `app.UseAuthentication()`
+before `app.UseAuthorization()`. A **fallback authorization policy** (`RequireAuthenticatedUser`) applies
+to every endpoint that doesn't opt out, so any request without a valid bearer token gets 401. Only
+`AuthController.Login` carries `[AllowAnonymous]`; `AuthController` has **no class-level `[AllowAnonymous]`**
+(that would leak onto `/profile`).
+
+### My Profile — `PUT /api/Auth/profile` (`[Authorize]`)
+
+Updates **only** `UserName`, for the UserId taken **from the JWT** (`User.FindFirstValue("userId")`) — never
+from the body. `UpdateProfileRequest` carries only `UserName` (required, trimmed; blank → 400); UserId/roles
+are unchangeable here. Returns `ProfileResponse { userId, userName }` (canonical, trimmed) via
+`AuthRepository.UpdateUserNameAsync`.
+
+### Change password (self) — `POST /api/Auth/change-password` (`[Authorize]`)
+
+UserId from the JWT. Order: (1) `SHA256(currentPassword)` must equal the stored hash else `400 目前密碼不正確`;
+(2) `PasswordPolicy.IsComplexEnough(newPassword)` (len ≥ 8 AND ≥ 3 of upper/lower/digit/symbol) else `400`
+with the exact bilingual complexity message; (3) new == confirm else `400`; (4) store `SHA256(new)` + bump
+`PasswordUpdatedTime`, `204`. `ChangePasswordRequest` is all-plaintext; no hash in or out.
+
+### Reset password to default (Admin) — `POST /api/Auth/reset-password` (`[Authorize(Roles="Admin")]`)
+
+**Role-enforced server-side** — a non-Admin authenticated caller gets **403**. Body is just `{ userId }`.
+Reads `appConfig.defaultPassword` at runtime, sets `PasswordHash = SHA256(default)` + `PasswordUpdatedTime`,
+`204` (404 if user missing). The AppUser edit form's reset button (Admin-only, `auth.isAdmin`) calls this;
+the client sends only the UserId. (The older `POST /api/app-users/{id}/reset-password` still exists but the
+form now uses the Admin-gated Auth endpoint.)
+
+Shared helpers: `Infrastructure/AppConfig.GetRequiredProperty` (one place to read the `appConfig` JSON;
+used by `SigningKeyProvider` and the reset flow) and `Infrastructure/PasswordPolicy`.
+
+### Tests
+
+- `AuthControllerTests` (unit, `Fakes/InMemoryAuthRepository` + `FakeSigningKeyProvider`): login happy path,
+  generic 401s, decoded `role` claims, ~24h expiry, no hash leak; profile updates the JWT user only,
+  leaves roles untouched, rejects blank UserName, 401 without a `userId` claim.
+- `AuthorizationTests` (integration, `WebApplicationFactory<Program>` + `ConfigureTestServices` swapping the
+  key provider + two repos): protected endpoint 401 without / with garbage token, 200 with a real token,
+  login reachable anonymously, `/profile` requires auth + ignores body `userId` + 400 on blank name.
+
+### Frontend (`CMS.NG`) auth
+
+- **`core/services/auth.service.ts`** — `login`/`logout`/`updateUserName`; stores the profile in **session
+  storage** (key `auth-profile`, not local storage); `profile`/`roles`/`isAdmin` signals; decodes the JWT
+  `role` claim (base64url) — no separate roles call.
+- **`core/interceptors/auth.interceptor.ts`** (functional, in `provideHttpClient(withInterceptors(...))`) —
+  attaches `Authorization: Bearer <token>` on every request; on a 401 clears the session and redirects to
+  `/login` (exempts the login request so its error surfaces on the page).
+- **`core/guards/auth.guard.ts`** (`canActivateChild`) wraps every app route; `/login` is the only public
+  route. `/profile` is a guarded child.
+- **`features/auth/login`** and **`features/auth/profile`** (UserId + roles read-only, UserName editable).
+- **`features/auth/password-policy.ts`** — shared client validators (`isPasswordComplex`,
+  `passwordComplexityValidator`, `passwordsMatchValidator`) + the bilingual complexity message; mirrors
+  the backend `PasswordPolicy`. Used by the Change Password form on the profile page.
+- **App shell** (`app.ts`/`app.html`): chrome renders only when authenticated; header shows the UserName +
+  a **My Profile** link + **Logout**; the **系統管理 Admin** nav group is hidden unless roles include
+  `Admin` (`visibleGroups` computed).
+- Tests: `auth.service.spec`, `auth.interceptor.spec`, `auth.guard.spec`, `app.spec` (Admin-menu
+  visibility), `login.spec`, `profile.spec` (read-only fields, save, change-password client validation),
+  `password-policy.spec`, and `app-user-form.spec` (reset button Admin-only).
 
 ## Course (課程)
 

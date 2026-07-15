@@ -1,0 +1,31 @@
+<div class="login-screen">
+  <form class="login-card" [formGroup]="form" (ngSubmit)="submit()">
+    <div class="login-brand">UWA CMS</div>
+    <h1 class="login-title">登入 Login</h1>
+
+    <div class="field">
+      <label for="userId">使用者代碼 <span class="req">*</span></label>
+      <input id="userId" type="text" pInputText formControlName="userId" autocomplete="username" placeholder="請輸入使用者代碼" />
+      @if (invalid('userId')) {
+        <small class="error">使用者代碼為必填。</small>
+      }
+    </div>
+
+    <div class="field">
+      <label for="password">密碼 <span class="req">*</span></label>
+      <input id="password" type="password" pInputText formControlName="password" autocomplete="current-password" placeholder="請輸入密碼" />
+      @if (invalid('password')) {
+        <small class="error">密碼為必填。</small>
+      }
+    </div>
+
+    <button
+      type="submit"
+      pButton
+      class="p-button-success login-submit"
+      icon="pi pi-sign-in"
+      label="登入"
+      [disabled]="submitting()"
+    ></button>
+  </form>
+</div>

@@ -1,7 +1,10 @@
-import { Component, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Component, computed, inject, signal } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ButtonModule } from 'primeng/button';
+
+import { AuthService } from '@core/services/auth.service';
 
 interface NavItem {
   label: string;
@@ -16,17 +19,27 @@ interface NavGroup {
   items: NavItem[];
 }
 
+// The 系統管理 Admin group is shown only to users whose roles include this.
+const ADMIN_GROUP_LABEL = '系統管理 Admin';
+const ADMIN_ROLE = 'Admin';
+
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ToastModule, ConfirmDialogModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ToastModule, ConfirmDialogModule, ButtonModule],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App {
+  readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+
   readonly collapsed = signal(false);
 
-  // Sidebar nav — only 系統管理 Admin > 角色 AppRole is wired to a route for now.
+  /** UserName of the signed-in user, shown in the shell header. */
+  readonly userName = computed(() => this.auth.profile()?.userName ?? '');
+
+  // Full sidebar nav.
   readonly groups = signal<NavGroup[]>([
     {
       label: '首頁管理 Home',
@@ -56,7 +69,7 @@ export class App {
     { label: '網站資訊 WebInfo', icon: 'pi pi-globe', expanded: false, items: [] },
     { label: '考試中心 TestingCenter', icon: 'pi pi-check-circle', expanded: false, items: [] },
     {
-      label: '系統管理 Admin',
+      label: ADMIN_GROUP_LABEL,
       icon: 'pi pi-shield',
       expanded: true,
       items: [
@@ -67,6 +80,11 @@ export class App {
     },
   ]);
 
+  /** Nav with the Admin group hidden unless the user's roles include "Admin". */
+  readonly visibleGroups = computed(() =>
+    this.groups().filter((g) => g.label !== ADMIN_GROUP_LABEL || this.auth.hasRole(ADMIN_ROLE)),
+  );
+
   toggleCollapsed(): void {
     this.collapsed.update((c) => !c);
   }
@@ -75,5 +93,10 @@ export class App {
     this.groups.update((groups) =>
       groups.map((g) => (g === target ? { ...g, expanded: !g.expanded } : g)),
     );
+  }
+
+  logout(): void {
+    this.auth.logout();
+    void this.router.navigateByUrl('/login');
   }
 }

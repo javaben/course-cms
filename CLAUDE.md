@@ -1,60 +1,26 @@
 # CLAUDE.md
 
-Guidance for Claude Code (claude.ai/code) when working in this repository.
+Full-stack CMS: **ASP.NET Core 9 (Dapper only, no EF)** / Angular 20 + PrimeNG / SQL Server.
+All code under `src/`; backend and Angular unit tests pass here.
 
-## What this is
+## Adding a feature (`/crud`)
 
-A full-stack CMS scaffolded from a SQL Server schema, following a fixed code-generation
-convention. Features are added table-by-table via `/crud`, driven by two source-of-truth inputs:
+Features are generated table-by-table from two source-of-truth inputs:
 
-- **`database/*.sql`** — the schema (raw `CREATE TABLE` scripts). `auth.sql` holds `AppRole`,
-  `AppUser`, `AppUserRole`; `admin`, `course`, `promotion` are future features.
-- **`spec/code-gen.convention.md`** — the mandatory backend + frontend patterns. **Read before
-  generating any new table's code.** `spec/sample1.spec.md` is a worked per-feature spec (Course)
-  showing the expected depth (FKs, n-n, query filters, copy actions). `spec/ui-sample-*.png` are
-  visual style references only.
+- **`database/*.sql`** — raw `CREATE TABLE` schema.
+- **`spec/code-gen.convention.md`** — mandatory backend + frontend patterns. **Read before
+  generating any table's code.**
 
-Everything lives under `src/`. No Entity Framework — **Dapper only**. Backend is fully built and
-tested. The Angular frontend builds and its unit tests run here (**Node 24 installed**,
-`node_modules` present) — `npx ng build` and `npx ng test --no-watch --browsers=ChromeHeadless` both
-pass. A **SQL Server (`CMS` DB) is reachable at `localhost:5000`** when the API is running, so read
-endpoints can be smoke-tested with real data (it holds production-like rows — avoid mutating it).
+Per-feature build specs follow `spec/feature-spec.template.md`; worked examples: `spec/sample1.spec.md`
+(Course — FK multi-map + N-N) and `spec/sample2.spec.md` (SkillTrain — N-N). `spec/ui-sample-*.png` are
+visual refs.
 
 ## Reference docs (read on demand)
 
-- **`docs/architecture.md`** — three-layer backend flow, the three PK shapes, n-n handling, routes,
-  tests, and Angular/PrimeNG frontend layout. Read when generating a table or changing the layering.
-- **`docs/features.md`** — the implemented features (AppRole, AppUser, PublishStatus, Partner,
-  CourseGroup, Course, FeaturedPromoItem), the AppUser password-handling convention, and the Course
-  FK-multi-map / N-N / QR-code / inline-list-edit patterns.
+- **`docs/development.md`** — commands, run order, the live `localhost:5000` DB (read-only).
+- **`docs/architecture.md`** — three-layer backend, the three PK shapes, n-n, routes, frontend layout.
+- **`docs/features.md`** — implemented features + their per-feature conventions.
+- **`spec/auth.md`** — auth feature (login/JWT, global authorization, profile, change/reset password).
 
-## Commands
-
-Backend (from `src/`, requires .NET 9 SDK):
-```powershell
-dotnet run --project CMS.API        # http://localhost:5000, Swagger UI at /swagger
-dotnet build CMS.slnx
-dotnet test                         # all xUnit tests
-dotnet test --filter "FullyQualifiedName~AppRolesControllerTests.Create_returns_409"  # single test
-```
-
-Frontend (from `src/CMS.NG`, **requires Node 20+**):
-```powershell
-npm install
-npm start                           # ng serve → http://localhost:4200
-npm test                            # Karma + Jasmine
-npm test -- --include src/app/features/app-roles/app-role-form/app-role-form.spec.ts   # single spec
-```
-
-## Run order for local dev
-
-1. Create the `CMS` database on `.\SQLEXPRESS` and run `database/*.sql` (start with `auth.sql`).
-2. `dotnet run --project CMS.API` (port 5000).
-3. `npm start` in `CMS.NG` (port 4200).
-
-## Keeping docs current
-
-Update the relevant file in the same change whenever you alter something it describes — a new table
-feature (`docs/features.md`), a command/port/path-alias or layering change (this file /
-`docs/architecture.md`). When a new convention emerges that isn't yet in
-`spec/code-gen.convention.md`, add it there and flag the gap.
+When you change something a doc describes, update that doc in the same change. When a new convention
+emerges, add it to `spec/code-gen.convention.md` and flag the gap.

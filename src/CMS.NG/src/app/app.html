@@ -1,57 +1,78 @@
-<div class="layout" [class.collapsed]="collapsed()">
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="brand">
-      <span class="brand-text">UWA</span>
-      <button type="button" class="brand-toggle" (click)="toggleCollapsed()" aria-label="收合選單">
-        <i class="pi" [class.pi-angle-left]="!collapsed()" [class.pi-angle-right]="collapsed()"></i>
-      </button>
-    </div>
+@if (auth.isAuthenticated()) {
+  <div class="layout" [class.collapsed]="collapsed()">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-text">UWA</span>
+        <button type="button" class="brand-toggle" (click)="toggleCollapsed()" aria-label="收合選單">
+          <i class="pi" [class.pi-angle-left]="!collapsed()" [class.pi-angle-right]="collapsed()"></i>
+        </button>
+      </div>
 
-    <nav class="nav">
-      @for (group of groups(); track group.label) {
-        <div class="nav-group">
-          <button type="button" class="nav-group-header" (click)="toggleGroup(group)">
-            <i class="nav-icon" [class]="group.icon"></i>
-            <span class="nav-label">{{ group.label }}</span>
-            <i
-              class="nav-caret pi"
-              [class.pi-angle-down]="group.expanded"
-              [class.pi-angle-right]="!group.expanded"
-            ></i>
-          </button>
+      <nav class="nav">
+        @for (group of visibleGroups(); track group.label) {
+          <div class="nav-group">
+            <button type="button" class="nav-group-header" (click)="toggleGroup(group)">
+              <i class="nav-icon" [class]="group.icon"></i>
+              <span class="nav-label">{{ group.label }}</span>
+              <i
+                class="nav-caret pi"
+                [class.pi-angle-down]="group.expanded"
+                [class.pi-angle-right]="!group.expanded"
+              ></i>
+            </button>
 
-          @if (group.expanded && group.items.length) {
-            <div class="nav-items">
-              @for (item of group.items; track item.label) {
-                @if (item.route) {
-                  <a
-                    class="nav-item"
-                    [routerLink]="item.route"
-                    routerLinkActive="active"
-                  >
-                    <i class="nav-icon" [class]="item.icon"></i>
-                    <span class="nav-label">{{ item.label }}</span>
-                  </a>
-                } @else {
-                  <span class="nav-item disabled">
-                    <i class="nav-icon" [class]="item.icon"></i>
-                    <span class="nav-label">{{ item.label }}</span>
-                  </span>
+            @if (group.expanded && group.items.length) {
+              <div class="nav-items">
+                @for (item of group.items; track item.label) {
+                  @if (item.route) {
+                    <a class="nav-item" [routerLink]="item.route" routerLinkActive="active">
+                      <i class="nav-icon" [class]="item.icon"></i>
+                      <span class="nav-label">{{ item.label }}</span>
+                    </a>
+                  } @else {
+                    <span class="nav-item disabled">
+                      <i class="nav-icon" [class]="item.icon"></i>
+                      <span class="nav-label">{{ item.label }}</span>
+                    </span>
+                  }
                 }
-              }
-            </div>
-          }
-        </div>
-      }
-    </nav>
-  </aside>
+              </div>
+            }
+          </div>
+        }
+      </nav>
+    </aside>
 
-  <!-- Main content -->
-  <main class="content">
-    <router-outlet />
-  </main>
-</div>
+    <!-- Main content -->
+    <main class="content">
+      <!-- Top bar with the signed-in user menu -->
+      <header class="topbar">
+        <div class="user-menu">
+          <a class="user-name" routerLink="/profile">
+            <i class="pi pi-user"></i>
+            <span>{{ userName() }}</span>
+          </a>
+          <button
+            type="button"
+            pButton
+            class="p-button-text p-button-sm"
+            icon="pi pi-sign-out"
+            label="登出"
+            (click)="logout()"
+          ></button>
+        </div>
+      </header>
+
+      <div class="content-body">
+        <router-outlet />
+      </div>
+    </main>
+  </div>
+} @else {
+  <!-- Unauthenticated (e.g. the login page) — no shell chrome. -->
+  <router-outlet />
+}
 
 <p-toast />
 <p-confirmdialog />

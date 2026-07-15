@@ -40,14 +40,16 @@
           <span class="text-muted">
             密碼更新時間：{{ passwordUpdatedTime() ? (passwordUpdatedTime()! + 'Z' | date: 'yyyy-MM-dd HH:mm') : '—' }}
           </span>
-          <button
-            type="button"
-            pButton
-            class="p-button-warning p-button-sm"
-            icon="pi pi-key"
-            label="重設密碼"
-            (click)="confirmResetPassword()"
-          ></button>
+          @if (isAdmin()) {
+            <button
+              type="button"
+              pButton
+              class="p-button-warning p-button-sm"
+              icon="pi pi-key"
+              label="重設為預設密碼"
+              (click)="confirmResetPassword()"
+            ></button>
+          }
         </div>
         <small class="text-muted">新增使用者時，系統會自動指定預設密碼。</small>
       </div>

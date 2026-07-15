@@ -9,9 +9,37 @@ import Aura from '@primeng/themes/aura';
 import { environment } from '@env/environment';
 
 import { AppUserForm } from './app-user-form';
+import { AuthService } from '@core/services/auth.service';
 
 const ROLES_URL = `${environment.apiBaseUrl}/api/lookups/app-roles`;
 const userUrl = (id: string) => `${environment.apiBaseUrl}/api/app-users/${id}`;
+const RESET_BUTTON_LABEL = '重設為預設密碼';
+
+function tokenWithRoles(roles: string[]): string {
+  const b64 = (o: unknown) =>
+    btoa(JSON.stringify(o)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  return `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ role: roles })}.sig`;
+}
+
+function seedSession(roles: string[]): void {
+  sessionStorage.setItem(
+    AuthService.STORAGE_KEY,
+    JSON.stringify({ userId: 'admin', userName: 'Admin', accessToken: tokenWithRoles(roles) }),
+  );
+}
+
+function loadEditUser(http: HttpTestingController): void {
+  http.expectOne(ROLES_URL).flush([]);
+  http.expectOne(userUrl('helen')).flush({
+    pkid: 1,
+    userId: 'helen',
+    userName: 'Helen Chen',
+    isActive: true,
+    passwordUpdatedTime: null,
+    roleCount: 0,
+    roleIds: [],
+  });
+}
 
 function configure(id: string | null): {
   fixture: ComponentFixture<AppUserForm>;
@@ -43,6 +71,8 @@ function configure(id: string | null): {
 }
 
 describe('AppUserForm', () => {
+  beforeEach(() => sessionStorage.clear());
+
   afterEach(() => {
     TestBed.inject(HttpTestingController).verify();
     TestBed.resetTestingModule();
@@ -105,5 +135,25 @@ describe('AppUserForm', () => {
     expect(req.request.body.userId).toBe('jenny');
     expect('passwordHash' in req.request.body).toBeFalse();
     req.flush({});
+  });
+
+  it('shows the reset-password button for Admin users in edit mode', () => {
+    seedSession(['Admin']);
+    const { fixture, http } = configure('helen');
+    fixture.detectChanges();
+    loadEditUser(http);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(RESET_BUTTON_LABEL);
+  });
+
+  it('hides the reset-password button for non-Admin users', () => {
+    seedSession(['User']);
+    const { fixture, http } = configure('helen');
+    fixture.detectChanges();
+    loadEditUser(http);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain(RESET_BUTTON_LABEL);
   });
 });

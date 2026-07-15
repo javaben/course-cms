@@ -1,6 +1,10 @@
+using CMS.API.Controllers;
 using CMS.API.Infrastructure;
 using CMS.API.Repositories;
 using Dapper;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
 
 // Dapper cannot bind DateOnly/TimeOnly as parameters out of the box (v2.1.66) — register handlers
 // so `date`/`time` columns round-trip. Must run before any query executes.
@@ -39,12 +43,46 @@ builder.Services.AddSingleton<IDbConnectionFactory>(
     new SqlConnectionFactory(builder.Configuration.GetConnectionString("CMS")!));
 builder.Services.AddScoped<IAppRoleRepository, AppRoleRepository>();
 builder.Services.AddScoped<IAppUserRepository, AppUserRepository>();
+builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IPublishStatusRepository, PublishStatusRepository>();
 builder.Services.AddScoped<IPartnerRepository, PartnerRepository>();
 builder.Services.AddScoped<ICourseGroupRepository, CourseGroupRepository>();
 builder.Services.AddScoped<ICourseRepository, CourseRepository>();
 builder.Services.AddScoped<IFeaturedPromoItemRepository, FeaturedPromoItemRepository>();
 builder.Services.AddScoped<ILookupRepository, LookupRepository>();
+
+// --- Authentication / Authorization -------------------------------------
+// JWT bearer, validated with the SAME SysConfig['appConfig'].symmetricSecurityKey used to issue
+// tokens in AuthController (both go through ISigningKeyProvider). Read at runtime, never hard-coded.
+builder.Services.AddSingleton<ISigningKeyProvider, SigningKeyProvider>();
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<ISigningKeyProvider>((options, signingKeys) =>
+    {
+        options.MapInboundClaims = false; // keep "role"/"sub" claim names verbatim
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            // Resolve the key lazily per validation so it comes from SysConfig at runtime (cached).
+            IssuerSigningKeyResolver = (_, _, _, _) => [signingKeys.GetSecurityKey()],
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
+            RoleClaimType = AuthController.RoleClaimType,
+            NameClaimType = "userName",
+        };
+    });
+
+// Secure by default: every endpoint requires an authenticated user unless it opts out with
+// [AllowAnonymous] (only AuthController does).
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 
 var app = builder.Build();
 
@@ -59,6 +97,7 @@ app.UseSwaggerUI(options =>
 
 app.UseCors(CorsPolicy);
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
