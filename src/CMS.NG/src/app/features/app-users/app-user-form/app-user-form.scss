@@ -1,0 +1,100 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0;
+  color: #1e293b;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 1.25rem;
+  color: #334155;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1.25rem;
+}
+
+.field:last-child {
+  margin-bottom: 0;
+}
+
+.field label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+.req {
+  color: #ef4444;
+}
+
+.text-muted {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.password-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.error {
+  color: #ef4444;
+  font-size: 0.8rem;
+}
+
+/* full-width PrimeNG inputs */
+:host ::ng-deep .p-inputtext,
+:host ::ng-deep .p-inputnumber,
+:host ::ng-deep .p-multiselect,
+:host ::ng-deep .w-full {
+  width: 100%;
+}
+
+/* allow multiselect chips to wrap */
+:host ::ng-deep .p-multiselect-label {
+  white-space: normal;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}

@@ -1,0 +1,145 @@
+<div class="page">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="title-block">
+      <h1 class="title">使用者 AppUser</h1>
+      <span class="subtitle">後台使用者帳號</span>
+    </div>
+    <div class="actions">
+      <button
+        type="button"
+        pButton
+        class="p-button-outlined"
+        icon="pi pi-filter"
+        label="搜尋條件"
+        (click)="drawerVisible.set(true)"
+      ></button>
+      <button
+        type="button"
+        pButton
+        class="p-button-success"
+        icon="pi pi-plus"
+        label="新增"
+        (click)="add()"
+      ></button>
+    </div>
+  </div>
+
+  <!-- Table card -->
+  <div class="card">
+    <p-table
+      [value]="users()"
+      [loading]="loading()"
+      [paginator]="true"
+      [rows]="pageState.rows"
+      [first]="pageState.first"
+      [rowsPerPageOptions]="rowsPerPageOptions"
+      [sortField]="sortState.sortField ?? undefined"
+      [sortOrder]="sortState.sortOrder"
+      [showCurrentPageReport]="true"
+      currentPageReportTemplate="{first}–{last} 筆，共 {totalRecords} 筆"
+      dataKey="userId"
+      (onSort)="onSort($event)"
+      (onPage)="onPage($event)"
+      styleClass="p-datatable-sm p-datatable-gridlines"
+    >
+      <ng-template pTemplate="header">
+        <tr>
+          <th pSortableColumn="pkid" style="width: 6rem">主代碼 <p-sortIcon field="pkid" /></th>
+          <th pSortableColumn="userId">使用者代碼 <p-sortIcon field="userId" /></th>
+          <th pSortableColumn="userName">使用者名稱 <p-sortIcon field="userName" /></th>
+          <th pSortableColumn="isActive" style="width: 7rem">啟用 <p-sortIcon field="isActive" /></th>
+          <th pSortableColumn="roleCount" style="width: 7rem">角色數 <p-sortIcon field="roleCount" /></th>
+          <th pSortableColumn="passwordUpdatedTime" style="width: 12rem">
+            密碼更新時間 <p-sortIcon field="passwordUpdatedTime" />
+          </th>
+          <th style="width: 9rem" class="text-center">操作</th>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="body" let-user>
+        <tr>
+          <td>{{ user.pkid }}</td>
+          <td>
+            <a class="link" [routerLink]="['/app-users', user.userId]">{{ user.userId }}</a>
+          </td>
+          <td>{{ user.userName }}</td>
+          <td>
+            <p-tag
+              [value]="user.isActive ? '啟用' : '停用'"
+              [severity]="user.isActive ? 'success' : 'danger'"
+            />
+          </td>
+          <td>{{ user.roleCount }}</td>
+          <td>
+            {{ user.passwordUpdatedTime ? (user.passwordUpdatedTime + 'Z' | date: 'yyyy-MM-dd HH:mm') : '—' }}
+          </td>
+          <td class="text-center">
+            <button
+              type="button"
+              pButton
+              class="p-button-text p-button-rounded"
+              icon="pi pi-eye"
+              pTooltip="檢視"
+              (click)="view(user)"
+            ></button>
+            <button
+              type="button"
+              pButton
+              class="p-button-text p-button-rounded"
+              icon="pi pi-pencil"
+              pTooltip="編輯"
+              (click)="edit(user)"
+            ></button>
+            <button
+              type="button"
+              pButton
+              class="p-button-text p-button-rounded p-button-danger"
+              icon="pi pi-trash"
+              pTooltip="刪除"
+              (click)="confirmDelete(user)"
+            ></button>
+          </td>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="7" class="text-center text-muted">查無資料</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+</div>
+
+<!-- Filter drawer -->
+<p-drawer [(visible)]="drawerVisibleModel" header="搜尋條件" position="right" styleClass="filter-drawer">
+  <div class="filter-body">
+    <div class="field">
+      <label for="f-keyword">關鍵字</label>
+      <input
+        id="f-keyword"
+        type="text"
+        pInputText
+        [(ngModel)]="filters.keyword"
+        placeholder="使用者代碼／名稱"
+      />
+    </div>
+    <div class="field">
+      <label for="f-active">啟用狀態</label>
+      <p-select
+        inputId="f-active"
+        [(ngModel)]="filters.isActive"
+        [options]="activeOptions"
+        optionLabel="label"
+        optionValue="value"
+        appendTo="body"
+      />
+    </div>
+  </div>
+
+  <div class="filter-footer">
+    <button type="button" pButton class="p-button-outlined" label="重設" (click)="resetFilters()"></button>
+    <button type="button" pButton label="套用" icon="pi pi-search" (click)="applyFilters()"></button>
+  </div>
+</p-drawer>

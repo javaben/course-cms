@@ -1,0 +1,28 @@
+<form class="page" [formGroup]="form" (ngSubmit)="save()">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="title-block">
+      <h1 class="title">{{ isEdit() ? '編輯課程群組' : '新增課程群組' }}</h1>
+      @if (isEdit()) {
+        <span class="subtitle">主代碼 {{ pkid() }}</span>
+      }
+    </div>
+    <div class="actions">
+      <button type="button" pButton class="p-button-outlined" icon="pi pi-times" label="取消" (click)="cancel()"></button>
+      <button type="submit" pButton class="p-button-success" icon="pi pi-check" label="儲存" [disabled]="saving()"></button>
+    </div>
+  </div>
+
+  <!-- Group data -->
+  <div class="card">
+    <h2 class="card-title">群組資料</h2>
+
+    <div class="field">
+      <label for="description">群組說明 <span class="req">*</span></label>
+      <input id="description" type="text" pInputText formControlName="description" maxlength="100" placeholder="請輸入群組說明" />
+      @if (invalid('description')) {
+        <small class="error">群組說明為必填。</small>
+      }
+    </div>
+  </div>
+</form>

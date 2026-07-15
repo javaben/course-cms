@@ -1,0 +1,80 @@
+<div class="board">
+  <header class="board-head">
+    <h1>上稿作業 <span class="en">FeaturedPromoItem</span></h1>
+  </header>
+
+  <!-- TrainingCenter tabs -->
+  <nav class="tabs" role="tablist">
+    @for (center of centers(); track center.pkid) {
+      <button
+        type="button"
+        role="tab"
+        class="tab"
+        [class.active]="center.pkid === activeCenter()"
+        [attr.aria-selected]="center.pkid === activeCenter()"
+        (click)="selectCenter(center.pkid)"
+      >
+        {{ center.label }}
+      </button>
+    }
+  </nav>
+
+  <!-- Week navigator -->
+  <div class="week-nav">
+    <button type="button" class="link-btn" (click)="prevWeek()">&lt;&lt;--</button>
+    <span class="week-label">{{ weekLabel() }}</span>
+    <button type="button" class="link-btn" (click)="nextWeek()">--&gt;&gt;</button>
+  </div>
+
+  <!-- Day groups -->
+  @for (day of days(); track day; let dayIndex = $index) {
+    <section class="day-group">
+      <h2 class="day-heading">{{ heading(day, dayIndex) }}</h2>
+
+      @for (slot of slots; track slot) {
+        <div class="slot-row">
+          <span class="slot-no">{{ slot }}</span>
+
+          @if (isEditing(day, slot)) {
+            <div class="slot-form">
+              <app-featured-promo-item-form
+                [context]="contextFor(day, slot)"
+                [item]="editing()!.item"
+                [seed]="editing()!.seed"
+                (saved)="onSaved()"
+                (cancelled)="onCancelled()"
+              />
+            </div>
+          } @else {
+            @let item = itemAt(day, slot);
+            @if (item) {
+              <span class="slot-actions">
+                <button type="button" class="mv" title="下移版位" (click)="move(item, 1)">+</button>
+                <button type="button" class="mv" title="上移版位" (click)="move(item, -1)">--</button>
+                <button type="button" class="link-btn" (click)="startEdit(day, slot, item)">Edit</button>
+                <button type="button" class="link-btn" (click)="copy(item)">Copy</button>
+                <button type="button" class="link-btn danger" (click)="confirmDelete(item)">Delete</button>
+              </span>
+              <span class="cell promo">{{ item.promoCode }}</span>
+              <span class="cell topic">{{ item.topic }}</span>
+              <span class="cell desc">{{ item.description }}</span>
+            } @else {
+              <span class="slot-actions">
+                <button type="button" class="link-btn" (click)="startEdit(day, slot, null)">Edit</button>
+                <button
+                  type="button"
+                  class="link-btn"
+                  [disabled]="!copyBuffer()"
+                  (click)="startPaste(day, slot)"
+                >
+                  Paste
+                </button>
+              </span>
+              <span class="cell empty"></span>
+            }
+          }
+        </div>
+      }
+    </section>
+  }
+</div>

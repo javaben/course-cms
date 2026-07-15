@@ -1,0 +1,52 @@
+<form class="page" [formGroup]="form" (ngSubmit)="save()">
+  <!-- Header -->
+  <div class="page-header">
+    <h1 class="title">{{ isEdit() ? '編輯發布狀態' : '新增發布狀態' }}</h1>
+    <div class="actions">
+      <button type="button" pButton class="p-button-outlined" icon="pi pi-times" label="取消" (click)="cancel()"></button>
+      <button type="submit" pButton class="p-button-success" icon="pi pi-check" label="儲存" [disabled]="saving()"></button>
+    </div>
+  </div>
+
+  <!-- Status data -->
+  <div class="card">
+    <h2 class="card-title">狀態資料</h2>
+
+    <div class="field">
+      <label for="pkid">主代碼 <span class="req">*</span></label>
+      <p-inputNumber
+        inputId="pkid"
+        formControlName="pkid"
+        [useGrouping]="false"
+        [min]="0"
+        [max]="255"
+      />
+      @if (invalid('pkid')) {
+        <small class="error">主代碼為必填（0–255）。</small>
+      }
+    </div>
+
+    <div class="field">
+      <label for="description">狀態說明 <span class="req">*</span></label>
+      <input id="description" type="text" pInputText formControlName="description" maxlength="50" placeholder="請輸入狀態說明" />
+      @if (invalid('description')) {
+        <small class="error">狀態說明為必填。</small>
+      }
+    </div>
+
+    <div class="field-inline">
+      <p-checkbox inputId="isDraft" formControlName="isDraft" [binary]="true" />
+      <label for="isDraft">草稿</label>
+    </div>
+
+    <div class="field-inline">
+      <p-checkbox inputId="isPublished" formControlName="isPublished" [binary]="true" />
+      <label for="isPublished">已發布</label>
+    </div>
+
+    <div class="field-inline">
+      <p-checkbox inputId="isDiscontinued" formControlName="isDiscontinued" [binary]="true" />
+      <label for="isDiscontinued">已停用</label>
+    </div>
+  </div>
+</form>

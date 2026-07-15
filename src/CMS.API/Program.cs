@@ -1,5 +1,11 @@
 using CMS.API.Infrastructure;
 using CMS.API.Repositories;
+using Dapper;
+
+// Dapper cannot bind DateOnly/TimeOnly as parameters out of the box (v2.1.66) — register handlers
+// so `date`/`time` columns round-trip. Must run before any query executes.
+SqlMapper.AddTypeHandler(new DateOnlyTypeHandler());
+SqlMapper.AddTypeHandler(new TimeOnlyTypeHandler());
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +38,11 @@ builder.Services.AddCors(options =>
 builder.Services.AddSingleton<IDbConnectionFactory>(
     new SqlConnectionFactory(builder.Configuration.GetConnectionString("CMS")!));
 builder.Services.AddScoped<IAppRoleRepository, AppRoleRepository>();
+builder.Services.AddScoped<IAppUserRepository, AppUserRepository>();
+builder.Services.AddScoped<IPublishStatusRepository, PublishStatusRepository>();
+builder.Services.AddScoped<IPartnerRepository, PartnerRepository>();
+builder.Services.AddScoped<ICourseGroupRepository, CourseGroupRepository>();
+builder.Services.AddScoped<IFeaturedPromoItemRepository, FeaturedPromoItemRepository>();
 builder.Services.AddScoped<ILookupRepository, LookupRepository>();
 
 var app = builder.Build();

@@ -16,7 +16,11 @@
   ### Controller
   - Route: `/api/{tablePlural}`; `PUT` takes pkid from body (no route param)
   - String PKs: route `{id}` (no `:int` constraint); service uses `encodeURIComponent`
-  - `DateOnly`/`TimeOnly` fields: register Dapper type handlers (already in Program.cs)
+  - `date`/`time` columns: use C# `DateOnly`/`TimeOnly`. Dapper 2.1.66 reads them fine but **cannot
+    bind them as parameters** without a handler — `Infrastructure/DapperTypeHandlers.cs` provides
+    `DateOnlyTypeHandler`/`TimeOnlyTypeHandler`, registered via `SqlMapper.AddTypeHandler` at the top of
+    `Program.cs`. System.Text.Json serialises `DateOnly` as `"yyyy-MM-dd"`. First used by
+    FeaturedPromoItem (`ScheduleOn`); verified live against SQL Server.
   
  ## Frontend
 
@@ -46,8 +50,8 @@
   | Column type | Handling |
   |-------------|---------|
   | `nchar(n)` | `RTRIM()` in all SQL SELECTs |
-  | `time(7)` | C# `TimeOnly` via `TimeOnlyTypeHandler`; display with `\| slice:0:5`; `p-datepicker [timeOnly]` in form |
-  | `date` | C# `DateOnly` via `DateOnlyTypeHandler`; `p-datepicker` in form |
+  | `time(7)` | C# `TimeOnly` via `TimeOnlyTypeHandler` (registered in Program.cs); display with `\| slice:0:5`; `p-datepicker [timeOnly]` in form |
+  | `date` | C# `DateOnly` via `DateOnlyTypeHandler` (registered in Program.cs); JSON `"yyyy-MM-dd"`; `p-datepicker` in form (or ISO-string grid for FeaturedPromoItem) |
   | `smallint` PK | No special handling |
   | `nvarchar` PK (string) | Controller route `{id}` (no `:int`); service calls `encodeURIComponent(id)` | 
   

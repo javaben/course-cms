@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
-import { forkJoin, of } from 'rxjs';
+import { forkJoin, of, Observable } from 'rxjs';
 
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
@@ -12,7 +12,7 @@ import { MessageService } from 'primeng/api';
 
 import { AppRoleService } from '@core/services/app-role.service';
 import { LookupService } from '@core/services/lookup.service';
-import { AppRoleRequest } from '@core/models/app-role.model';
+import { AppRole, AppRoleRequest } from '@core/models/app-role.model';
 import { AppUserLookup } from '@core/models/app-user-lookup.model';
 
 @Component({
@@ -96,7 +96,9 @@ export class AppRoleForm implements OnInit {
     };
 
     this.saving.set(true);
-    const op$ = this.isEdit() ? this.service.update(request) : this.service.create(request);
+    const op$: Observable<AppRole | void> = this.isEdit()
+      ? this.service.update(request)
+      : this.service.create(request);
 
     op$.subscribe({
       next: () => {

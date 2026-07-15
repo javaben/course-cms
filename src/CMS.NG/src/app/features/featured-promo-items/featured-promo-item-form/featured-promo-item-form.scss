@@ -1,0 +1,53 @@
+.cell-form {
+  border: 2px solid #1a1a1a;
+  padding: 1rem 1.25rem;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 60rem;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  label {
+    min-width: 6rem;
+    font-weight: 600;
+  }
+
+  input {
+    flex: 1;
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 2.5rem;
+  padding-left: 6.75rem;
+  margin-top: 0.25rem;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: #1565c0;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+
+  &:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+.error {
+  color: #c62828;
+  padding-left: 6.75rem;
+}

@@ -1,0 +1,62 @@
+<div class="page">
+  <!-- Header -->
+  <div class="page-header">
+    <h1 class="title">檢視使用者</h1>
+    <div class="actions">
+      <button type="button" pButton class="p-button-outlined" icon="pi pi-arrow-left" label="返回" (click)="back()"></button>
+      <button type="button" pButton class="p-button-warning" icon="pi pi-key" label="重設密碼" (click)="confirmResetPassword()"></button>
+      <button type="button" pButton class="p-button-success" icon="pi pi-pencil" label="編輯" (click)="edit()"></button>
+    </div>
+  </div>
+
+  @if (user(); as u) {
+    <!-- User data -->
+    <div class="card">
+      <h2 class="card-title">使用者資料</h2>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">主代碼</span>
+          <span class="detail-value">{{ u.pkid }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">使用者代碼</span>
+          <span class="detail-value">{{ u.userId }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">使用者名稱</span>
+          <span class="detail-value">{{ u.userName }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">啟用</span>
+          <span class="detail-value">
+            <p-tag [value]="u.isActive ? '啟用' : '停用'" [severity]="u.isActive ? 'success' : 'danger'" />
+          </span>
+        </div>
+        <div class="detail-item full">
+          <span class="detail-label">密碼更新時間</span>
+          <span class="detail-value">
+            {{ u.passwordUpdatedTime ? (u.passwordUpdatedTime + 'Z' | date: 'yyyy-MM-dd HH:mm') : '—' }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Roles -->
+    <div class="card">
+      <h2 class="card-title">角色（{{ u.roleCount }}）</h2>
+      @if (roleLabels().length) {
+        <div class="chips">
+          @for (label of roleLabels(); track label) {
+            <p-tag [value]="label" severity="info" />
+          }
+        </div>
+      } @else {
+        <span class="text-muted">尚未指派角色</span>
+      }
+    </div>
+  } @else if (!loading()) {
+    <div class="card">
+      <span class="text-muted">查無此使用者。</span>
+    </div>
+  }
+</div>

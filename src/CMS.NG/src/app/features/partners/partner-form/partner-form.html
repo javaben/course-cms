@@ -1,0 +1,70 @@
+<form class="page" [formGroup]="form" (ngSubmit)="save()">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="title-block">
+      <h1 class="title">{{ isEdit() ? '編輯合作廠商' : '新增合作廠商' }}</h1>
+      @if (isEdit()) {
+        <span class="subtitle">主代碼 {{ pkid() }}</span>
+      }
+    </div>
+    <div class="actions">
+      <button type="button" pButton class="p-button-outlined" icon="pi pi-times" label="取消" (click)="cancel()"></button>
+      <button type="submit" pButton class="p-button-success" icon="pi pi-check" label="儲存" [disabled]="saving()"></button>
+    </div>
+  </div>
+
+  <!-- Partner data -->
+  <div class="card">
+    <h2 class="card-title">廠商資料</h2>
+
+    <div class="field">
+      <label for="name">廠商名稱 <span class="req">*</span></label>
+      <input id="name" type="text" pInputText formControlName="name" maxlength="50" placeholder="請輸入廠商名稱" />
+      @if (invalid('name')) {
+        <small class="error">廠商名稱為必填。</small>
+      }
+    </div>
+
+    <div class="field">
+      <label for="appKey">應用代碼 <span class="req">*</span></label>
+      <input id="appKey" type="text" pInputText formControlName="appKey" maxlength="10" placeholder="請輸入應用代碼" />
+      @if (invalid('appKey')) {
+        <small class="error">應用代碼為必填。</small>
+      }
+    </div>
+
+    <div class="field">
+      <label for="nameOnPartnerMenu">選單顯示名稱 <span class="req">*</span></label>
+      <input id="nameOnPartnerMenu" type="text" pInputText formControlName="nameOnPartnerMenu" maxlength="200" />
+      @if (invalid('nameOnPartnerMenu')) {
+        <small class="error">選單顯示名稱為必填。</small>
+      }
+    </div>
+
+    <div class="field">
+      <label for="nameOnCourseDetailPage">課程頁顯示名稱 <span class="req">*</span></label>
+      <input id="nameOnCourseDetailPage" type="text" pInputText formControlName="nameOnCourseDetailPage" maxlength="50" />
+      @if (invalid('nameOnCourseDetailPage')) {
+        <small class="error">課程頁顯示名稱為必填。</small>
+      }
+    </div>
+
+    <div class="field">
+      <label for="displayOrder">顯示順序 <span class="req">*</span></label>
+      <p-inputNumber
+        inputId="displayOrder"
+        formControlName="displayOrder"
+        [useGrouping]="false"
+        [min]="0"
+      />
+      @if (invalid('displayOrder')) {
+        <small class="error">顯示順序為必填。</small>
+      }
+    </div>
+
+    <div class="field">
+      <label for="imageFilename">圖片檔名</label>
+      <input id="imageFilename" type="text" pInputText formControlName="imageFilename" maxlength="50" />
+    </div>
+  </div>
+</form>

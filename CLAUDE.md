@@ -15,8 +15,10 @@ convention. Features are added table-by-table via `/crud`, driven by two source-
   visual style references only.
 
 Everything lives under `src/`. No Entity Framework — **Dapper only**. Backend is fully built and
-tested; the Angular frontend is authored to compile but **Node.js is not installed here**, so it has
-never been `npm install`/`ng build`-verified.
+tested. The Angular frontend builds and its unit tests run here (**Node 24 installed**,
+`node_modules` present) — `npx ng build` and `npx ng test --no-watch --browsers=ChromeHeadless` both
+pass. A **SQL Server (`CMS` DB) is reachable at `localhost:5000`** when the API is running, so read
+endpoints can be smoke-tested with real data (it holds production-like rows — avoid mutating it).
 
 ## Reference docs (read on demand)
 

@@ -1,0 +1,36 @@
+<form [formGroup]="form" (ngSubmit)="save()" class="cell-form">
+  <div class="field">
+    <label [for]="'promoCode-' + context.slot">PromoCode:</label>
+    <input
+      pInputText
+      [id]="'promoCode-' + context.slot"
+      formControlName="promoCode"
+      (blur)="onPromoCodeBlur()"
+      autocomplete="off"
+      [class.ng-invalid-visible]="invalid('promoCode')"
+    />
+  </div>
+  @if (lookupError()) {
+    <small class="error">{{ lookupError() }}</small>
+  }
+
+  <div class="field">
+    <label [for]="'topic-' + context.slot">Topic:</label>
+    <input pInputText [id]="'topic-' + context.slot" formControlName="topic" autocomplete="off" />
+  </div>
+
+  <div class="field">
+    <label [for]="'description-' + context.slot">Description:</label>
+    <input
+      pInputText
+      [id]="'description-' + context.slot"
+      formControlName="description"
+      autocomplete="off"
+    />
+  </div>
+
+  <div class="actions">
+    <button type="submit" class="link-btn" [disabled]="saving()">Save</button>
+    <button type="button" class="link-btn" (click)="cancel()" [disabled]="saving()">Cancel</button>
+  </div>
+</form>

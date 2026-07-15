@@ -1,0 +1,153 @@
+.board {
+  padding: 1rem 1.5rem;
+}
+
+.board-head h1 {
+  font-size: 1.4rem;
+  margin: 0 0 0.75rem;
+
+  .en {
+    color: #888;
+    font-weight: 400;
+    font-size: 1rem;
+  }
+}
+
+// --- TrainingCenter tabs ---------------------------------------------
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 2px solid #c8c8c8;
+  margin-bottom: 0.75rem;
+}
+
+.tab {
+  border: 1px solid #c8c8c8;
+  border-bottom: none;
+  background: #f0f0f0;
+  padding: 0.4rem 1.1rem;
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  color: #333;
+
+  &.active {
+    background: #fff;
+    color: #1565c0;
+    font-weight: 600;
+    border-color: #1565c0;
+    margin-bottom: -2px;
+    border-bottom: 2px solid #fff;
+  }
+}
+
+// --- Week navigator --------------------------------------------------
+.week-nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.5rem 0 1rem;
+
+  .week-label {
+    font-weight: 600;
+    min-width: 9rem;
+    text-align: center;
+  }
+}
+
+// --- Day groups ------------------------------------------------------
+.day-group {
+  margin-bottom: 0.75rem;
+}
+
+.day-heading {
+  background: #e4e4e4;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+}
+
+.slot-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.slot-no {
+  width: 1rem;
+  font-weight: 600;
+  padding-top: 0.15rem;
+}
+
+.slot-actions {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  white-space: nowrap;
+  padding-top: 0.1rem;
+}
+
+.slot-form {
+  flex: 1;
+}
+
+.cell {
+  border: 1px solid #cfcfcf;
+  padding: 0.2rem 0.5rem;
+  background: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &.promo {
+    flex: 0 0 20rem;
+  }
+  &.topic {
+    flex: 0 0 20rem;
+  }
+  &.desc {
+    flex: 1;
+  }
+  &.empty {
+    flex: 1;
+    border-style: dashed;
+    background: #fafafa;
+  }
+}
+
+// --- Link-style buttons ----------------------------------------------
+.link-btn {
+  background: none;
+  border: none;
+  color: #1565c0;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+
+  &:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+  &.danger {
+    color: #c62828;
+  }
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+}
+
+.mv {
+  background: none;
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 0.3rem;
+  color: #333;
+
+  &:hover {
+    background: #eee;
+  }
+}

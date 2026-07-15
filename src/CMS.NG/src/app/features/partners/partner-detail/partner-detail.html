@@ -1,0 +1,50 @@
+<div class="page">
+  <!-- Header -->
+  <div class="page-header">
+    <h1 class="title">檢視合作廠商</h1>
+    <div class="actions">
+      <button type="button" pButton class="p-button-outlined" icon="pi pi-arrow-left" label="返回" (click)="back()"></button>
+      <button type="button" pButton class="p-button-success" icon="pi pi-pencil" label="編輯" (click)="edit()"></button>
+    </div>
+  </div>
+
+  @if (partner(); as p) {
+    <div class="card">
+      <h2 class="card-title">廠商資料</h2>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">主代碼</span>
+          <span class="detail-value">{{ p.pkid }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">廠商名稱</span>
+          <span class="detail-value">{{ p.name }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">應用代碼</span>
+          <span class="detail-value">{{ p.appKey }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">顯示順序</span>
+          <span class="detail-value">{{ p.displayOrder }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">選單顯示名稱</span>
+          <span class="detail-value">{{ p.nameOnPartnerMenu }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">課程頁顯示名稱</span>
+          <span class="detail-value">{{ p.nameOnCourseDetailPage }}</span>
+        </div>
+        <div class="detail-item full">
+          <span class="detail-label">圖片檔名</span>
+          <span class="detail-value">{{ p.imageFilename || '—' }}</span>
+        </div>
+      </div>
+    </div>
+  } @else if (!loading()) {
+    <div class="card">
+      <span class="text-muted">查無此合作廠商。</span>
+    </div>
+  }
+</div>
