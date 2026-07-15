@@ -30,6 +30,17 @@ function configure(id: string | null): void {
   });
 }
 
+/** Asserts the action toolbar is pinned (sticky) and still holds Save + Cancel. */
+function expectStickyToolbar(fixture: ComponentFixture<CourseForm>): void {
+  const header: HTMLElement = fixture.nativeElement.querySelector('.page-header');
+  expect(header).withContext('.page-header toolbar renders').toBeTruthy();
+  expect(getComputedStyle(header).position).toBe('sticky');
+
+  const labels = Array.from(header.querySelectorAll('button')).map((b) => b.textContent?.trim() ?? '');
+  expect(labels.some((t) => t.includes('儲存'))).withContext('Save button present').toBeTrue();
+  expect(labels.some((t) => t.includes('取消'))).withContext('Cancel button present').toBeTrue();
+}
+
 function flushLookups(http: HttpTestingController): void {
   http.expectOne(`${base}/api/lookups/partners`).flush([{ pkid: 1, name: '微軟', label: '微軟' }]);
   http.expectOne(`${base}/api/lookups/course-groups`).flush([{ pkid: 5, description: '雲端', label: '雲端' }]);
@@ -59,6 +70,10 @@ describe('CourseForm', () => {
     it('starts in create mode with an empty pkid', () => {
       expect(component.isEdit()).toBeFalse();
       expect(component.pkid()).toBe(0);
+    });
+
+    it('pins the Save/Cancel toolbar to the top (sticky) on the New form', () => {
+      expectStickyToolbar(fixture);
     });
 
     it('does not submit an invalid form', () => {
@@ -144,6 +159,10 @@ describe('CourseForm', () => {
     });
 
     afterEach(() => http.verify());
+
+    it('pins the Save/Cancel toolbar to the top (sticky) on the Edit form', () => {
+      expectStickyToolbar(fixture);
+    });
 
     it('loads the course and keeps the stored 下架日期 (not the +10y default)', () => {
       expect(component.isEdit()).toBeTrue();
