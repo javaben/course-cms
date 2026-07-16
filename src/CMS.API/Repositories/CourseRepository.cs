@@ -11,11 +11,15 @@ namespace CMS.API.Repositories;
 /// </summary>
 public sealed class CourseRepository : ICourseRepository
 {
-    private readonly IDbConnectionFactory _factory;
+    private const string TableName = "Course";
 
-    public CourseRepository(IDbConnectionFactory factory)
+    private readonly IDbConnectionFactory _factory;
+    private readonly IRowAuditWriter _audit;
+
+    public CourseRepository(IDbConnectionFactory factory, IRowAuditWriter audit)
     {
         _factory = factory;
+        _audit = audit;
     }
 
     // Course scalar columns + the three FK nav objects (each nav's leading column AS Pkid → splitOn).
@@ -53,10 +57,10 @@ public sealed class CourseRepository : ICourseRepository
         LEFT JOIN PublishStatus s ON s.pkid = c.PublishStatus_pkid";
 
     private static async Task<List<Course>> QueryCoursesAsync(
-        IDbConnection conn, string sql, object? param, CancellationToken ct)
+        IDbConnection conn, string sql, object? param, CancellationToken ct, IDbTransaction? tx = null)
     {
         var rows = await conn.QueryAsync<Course, PartnerLookup, CourseGroupLookup, PublishStatusLookup, Course>(
-            new CommandDefinition(sql, param, cancellationToken: ct),
+            new CommandDefinition(sql, param, tx, cancellationToken: ct),
             (course, partner, group, status) =>
             {
                 course.Partner = partner;
@@ -140,13 +144,22 @@ public sealed class CourseRepository : ICourseRepository
     public async Task<Course?> GetByIdAsync(int pkid, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        return await LoadAsync(conn, null, pkid, ct);
+    }
 
+    /// <summary>
+    /// Loads one course (FK nav objects + both N-N id lists) on the given connection/transaction —
+    /// used to snapshot the row before/after a change for the audit log.
+    /// </summary>
+    private static async Task<Course?> LoadAsync(
+        IDbConnection conn, IDbTransaction? tx, int pkid, CancellationToken ct)
+    {
         var sql = $"{SelectColumns} WHERE c.pkid = @Pkid";
-        var rows = await QueryCoursesAsync(conn, sql, new { Pkid = pkid }, ct);
+        var rows = await QueryCoursesAsync(conn, sql, new { Pkid = pkid }, ct, tx);
         var course = rows.FirstOrDefault();
         if (course is null) return null;
 
-        await LoadJunctionsAsync(conn, null, course, ct);
+        await LoadJunctionsAsync(conn, tx, course, ct);
         return course;
     }
 
@@ -168,9 +181,12 @@ public sealed class CourseRepository : ICourseRepository
             request, tx, cancellationToken: ct));
 
         await SyncJunctionsAsync(conn, tx, newId, request, ct);
-        tx.Commit();
 
-        return (await GetByIdAsync(newId, ct))!;
+        var created = (await LoadAsync(conn, tx, newId, ct))!;
+        await _audit.LogInsertAsync(conn, tx, TableName, created, ct);
+
+        tx.Commit();
+        return created;
     }
 
     public async Task<bool> UpdateAsync(CourseRequest request, CancellationToken ct = default)
@@ -178,7 +194,10 @@ public sealed class CourseRepository : ICourseRepository
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
         using var tx = conn.BeginTransaction();
 
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
+        var before = await LoadAsync(conn, tx, request.Pkid, ct);
+        if (before is null) { tx.Rollback(); return false; }
+
+        await conn.ExecuteAsync(new CommandDefinition(
             @"UPDATE Course
                  SET Title=@Title, OfficialTitle=@OfficialTitle, CourseId=@CourseId,
                      ProdCourseId=@ProdCourseId, FriendlyUrl=@FriendlyUrl, DisplayOrder=@DisplayOrder,
@@ -190,13 +209,11 @@ public sealed class CourseRepository : ICourseRepository
                WHERE pkid=@Pkid;",
             request, tx, cancellationToken: ct));
 
-        if (affected == 0)
-        {
-            tx.Rollback();
-            return false;
-        }
-
         await SyncJunctionsAsync(conn, tx, request.Pkid, request, ct);
+
+        var after = (await LoadAsync(conn, tx, request.Pkid, ct))!;
+        await _audit.LogUpdateAsync(conn, tx, TableName, before, after, ct);
+
         tx.Commit();
         return true;
     }
@@ -206,18 +223,23 @@ public sealed class CourseRepository : ICourseRepository
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
         using var tx = conn.BeginTransaction();
 
+        var before = await LoadAsync(conn, tx, pkid, ct);
+        if (before is null) { tx.Rollback(); return false; }
+
         // Remove junction rows first, then the course (FK-safe even without ON DELETE CASCADE).
         await conn.ExecuteAsync(new CommandDefinition(
             "DELETE FROM CourseInCertification WHERE Course_pkid=@Pkid;" +
             "DELETE FROM CourseJobCategories WHERE Course_pkid=@Pkid;",
             new { Pkid = pkid }, tx, cancellationToken: ct));
 
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
+        await conn.ExecuteAsync(new CommandDefinition(
             "DELETE FROM Course WHERE pkid=@Pkid",
             new { Pkid = pkid }, tx, cancellationToken: ct));
 
+        await _audit.LogDeleteAsync(conn, tx, TableName, before, ct);
+
         tx.Commit();
-        return affected > 0;
+        return true;
     }
 
     /// <summary>Fill the two N-N id lists for a loaded course (same connection; optional tx).</summary>

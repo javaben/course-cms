@@ -33,3 +33,6 @@ Thumbs.db
 .DS_Store
 *.swp
 .idea/
+.gstack/
+
+.claude/worktrees/

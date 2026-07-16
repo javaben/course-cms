@@ -6,6 +6,8 @@ import { providePrimeNG } from 'primeng/config';
 import { MessageService } from 'primeng/api';
 import Aura from '@primeng/themes/aura';
 import { environment } from '@env/environment';
+import { of } from 'rxjs';
+import { RowAuditService } from '@core/services/row-audit.service';
 
 import { CellContext, FeaturedPromoItemForm } from './featured-promo-item-form';
 import { FeaturedPromoItem } from '@core/models/featured-promo-item.model';
@@ -46,6 +48,7 @@ describe('FeaturedPromoItemForm', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: RowAuditService, useValue: { getForRecord: () => of([]) } },
         provideNoopAnimations(),
         providePrimeNG({ theme: { preset: Aura } }),
         MessageService,

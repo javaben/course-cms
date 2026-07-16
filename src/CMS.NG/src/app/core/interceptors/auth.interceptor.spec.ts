@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router } from '@angular/router';
+import { MessageService } from 'primeng/api';
 import { environment } from '@env/environment';
 
 import { authInterceptor } from './auth.interceptor';
@@ -20,15 +21,18 @@ function seedSession(accessToken: string): void {
 describe('authInterceptor', () => {
   let http: HttpTestingController;
   let router: { navigateByUrl: jasmine.Spy };
+  let messages: { add: jasmine.Spy };
 
   beforeEach(() => {
     sessionStorage.clear();
     router = { navigateByUrl: jasmine.createSpy('navigateByUrl') };
+    messages = { add: jasmine.createSpy('add') };
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),
         provideHttpClientTesting(),
         { provide: Router, useValue: router },
+        { provide: MessageService, useValue: messages },
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -77,5 +81,38 @@ describe('authInterceptor', () => {
     http.expectOne(LOGIN_URL).flush('bad', { status: 401, statusText: 'Unauthorized' });
 
     expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('on a 500 shows a friendly error toast using the safe message from the body', () => {
+    seedSession('tok123');
+    const client = TestBed.inject(HttpClient);
+
+    client.get(URL).subscribe({ next: () => {}, error: () => {} });
+
+    http.expectOne(URL).flush(
+      { message: 'An unexpected error occurred.' },
+      { status: 500, statusText: 'Internal Server Error' },
+    );
+
+    expect(messages.add).toHaveBeenCalledTimes(1);
+    const arg = messages.add.calls.mostRecent().args[0];
+    expect(arg.severity).toBe('error');
+    expect(arg.detail).toBe('An unexpected error occurred.');
+    // A server error is not a 401 → no session clear / redirect.
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('does not toast on a 400 validation error (forms surface it themselves)', () => {
+    seedSession('tok123');
+    const client = TestBed.inject(HttpClient);
+
+    client.get(URL).subscribe({ next: () => {}, error: () => {} });
+
+    http.expectOne(URL).flush(
+      { errors: { name: ['required'] } },
+      { status: 400, statusText: 'Bad Request' },
+    );
+
+    expect(messages.add).not.toHaveBeenCalled();
   });
 });

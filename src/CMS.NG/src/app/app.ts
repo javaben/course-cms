@@ -76,6 +76,7 @@ export class App {
         { label: '角色 AppRole', icon: 'pi pi-id-card', route: '/app-roles' },
         { label: '使用者 AppUser', icon: 'pi pi-user', route: '/app-users' },
         { label: '發布狀態 PublishStatus', icon: 'pi pi-flag', route: '/publish-statuses' },
+        { label: '異動紀錄 RowAudit', icon: 'pi pi-history', route: '/row-audits' },
       ],
     },
   ]);

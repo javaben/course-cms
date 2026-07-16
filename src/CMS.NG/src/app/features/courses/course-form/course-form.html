@@ -8,6 +8,7 @@
       }
     </div>
     <div class="actions">
+      <app-row-audit-badge [tableName]="'Course'" [pkid]="pkid()"></app-row-audit-badge>
       <button type="button" pButton class="p-button-outlined" icon="pi pi-times" label="取消" (click)="cancel()"></button>
       <button type="submit" pButton class="p-button-success" icon="pi pi-check" label="儲存" [disabled]="saving()"></button>
     </div>

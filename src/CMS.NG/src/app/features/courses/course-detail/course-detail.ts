@@ -11,12 +11,13 @@ import { LookupService } from '@core/services/lookup.service';
 import { Course } from '@core/models/course.model';
 import { CertificationLookup } from '@core/models/certification-lookup.model';
 import { JobCategoryLookup } from '@core/models/job-category-lookup.model';
+import { RowAuditBadge } from '@app/shared/row-audit-badge/row-audit-badge';
 import { CourseQrCode } from './course-qr-code/course-qr-code';
 
 @Component({
   selector: 'app-course-detail',
   standalone: true,
-  imports: [RouterLink, ButtonModule, TagModule, CourseQrCode],
+  imports: [RouterLink, ButtonModule, TagModule, CourseQrCode, RowAuditBadge],
   templateUrl: './course-detail.html',
   styleUrl: './course-detail.scss',
 })

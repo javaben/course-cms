@@ -94,6 +94,19 @@ function emptyFilters(): FilterModel {
   };
 }
 
+/** Escapes one CSV field: wraps in quotes and doubles any embedded quote when needed. */
+function csvCell(value: unknown): string {
+  const s = value == null ? '' : String(value);
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Filename-safe local timestamp, e.g. "20260715-143005", for the export download. */
+function fileStamp(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
 @Component({
   selector: 'app-course-list',
   standalone: true,
@@ -124,6 +137,9 @@ export class CourseList implements OnInit {
   readonly courses = signal<Course[]>([]);
   readonly loading = signal(false);
   readonly drawerVisible = signal(false);
+
+  /** Rows ticked via the multi-select checkbox column — drives the bulk delete / export actions. */
+  readonly selectedCourses = signal<Course[]>([]);
 
   readonly partners = signal<PartnerLookup[]>([]);
   readonly courseGroups = signal<CourseGroupLookup[]>([]);
@@ -179,6 +195,7 @@ export class CourseList implements OnInit {
 
   load(): void {
     this.loading.set(true);
+    this.selectedCourses.set([]); // a fresh result set invalidates any prior selection
     this.service
       .query(this.toQuery())
       .pipe(finalize(() => this.loading.set(false)))
@@ -419,6 +436,71 @@ export class CourseList implements OnInit {
       error: () =>
         this.messages.add({ severity: 'error', summary: '刪除失敗', detail: '無法刪除課程。' }),
     });
+  }
+
+  // ==================================================================
+  //  Bulk actions (multi-select checkbox column)
+  // ==================================================================
+
+  confirmBulkDelete(): void {
+    const rows = this.selectedCourses();
+    if (rows.length === 0) return;
+    this.confirmation.confirm({
+      header: '批次刪除確認',
+      message: `確定要刪除所選的 <b>${rows.length}</b> 筆課程？此動作無法復原。`,
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: '刪除',
+      rejectLabel: '取消',
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => this.bulkDelete(rows),
+    });
+  }
+
+  private bulkDelete(rows: Course[]): void {
+    forkJoin(rows.map((c) => this.service.delete(c.pkid))).subscribe({
+      next: () => {
+        this.messages.add({ severity: 'success', summary: '已刪除', detail: `已刪除 ${rows.length} 筆課程。` });
+        this.selectedCourses.set([]);
+        this.load();
+      },
+      error: () =>
+        this.messages.add({
+          severity: 'error',
+          summary: '刪除失敗',
+          detail: '批次刪除時發生錯誤，部分課程可能未刪除。',
+        }),
+    });
+  }
+
+  /** Export the selected rows (the on-screen columns) to a UTF-8 CSV download. */
+  exportSelected(): void {
+    const rows = this.selectedCourses();
+    if (rows.length === 0) return;
+
+    const header = [
+      '主代碼', '顯示順序', '簡介代碼', '科目代碼', '課程名稱', '原廠', '課程群組',
+      '上架狀態', '上架日期', '下架日期', '時數', '定價', '點數', '允許重聽',
+    ];
+    const body = rows.map((c) =>
+      [
+        c.pkid, c.displayOrder, c.courseId, c.prodCourseId, c.title,
+        c.partner?.label ?? '', c.courseGroup?.label ?? '', c.publishStatus?.label ?? '',
+        c.scheduleOn, c.scheduleOff, c.hour, c.listPrice, c.learningCredit,
+        c.canRepeat ? '是' : '否',
+      ].map(csvCell).join(','),
+    );
+
+    // Prepend a BOM so Excel opens the UTF-8 (CJK) content correctly.
+    const csv = '﻿' + [header.join(','), ...body].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `courses-${fileStamp()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    this.messages.add({ severity: 'success', summary: '已匯出', detail: `已匯出 ${rows.length} 筆課程。` });
   }
 
   private restoreState(): void {

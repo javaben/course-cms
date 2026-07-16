@@ -160,6 +160,45 @@ describe('CourseList', () => {
     expect(component.courses()[0].title).toBe('Azure 進階');
   });
 
+  // ---- 上架狀態 dropdown (the only p-select inline editor) ------------
+
+  it('persists a changed 上架狀態 via the update endpoint', () => {
+    init();
+    const row = component.courses()[0]; // publishStatusPkid = 2
+
+    component.startEdit(row, 'publishStatusPkid');
+    component.editValue = 1; // p-select onChange writes the chosen pkid
+    component.commit(row, 'publishStatusPkid');
+
+    http.expectOne(`${base}/api/courses/1`).flush(fullCourse());
+    const put = http.expectOne(`${base}/api/courses`);
+    expect(put.request.method).toBe('PUT');
+    expect(put.request.body.publishStatusPkid).toBe(1);
+    put.flush(null);
+
+    expect(component.editing()).toBeNull();
+    expect(component.courses()[0].publishStatusPkid).toBe(1);
+    expect(component.courses()[0].publishStatus?.label).toBe('1 - 草稿'); // refreshed label
+  });
+
+  it('keeps the 上架狀態 editor open when its dropdown blurs (no premature commit)', () => {
+    init();
+    const cell: HTMLElement = fixture.nativeElement.querySelector('td[data-field="publishStatusPkid"]');
+
+    cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    fixture.detectChanges();
+    expect(component.editing()).toEqual({ pkid: 1, field: 'publishStatusPkid' });
+
+    // Opening the overlay blurs the trigger; that must NOT commit and close the cell.
+    const select: HTMLElement = cell.querySelector('p-select')!;
+    select.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+    fixture.detectChanges();
+
+    expect(component.editing()).toEqual({ pkid: 1, field: 'publishStatusPkid' }); // still editing
+    http.expectNone(`${base}/api/courses/1`);
+    http.expectNone(`${base}/api/courses`);
+  });
+
   // ---- Validation ----------------------------------------------------
 
   it('blocks a cleared required field and stays in edit mode', () => {
@@ -227,5 +266,52 @@ describe('CourseList', () => {
 
     expect(component.editing()).toBeNull();                    // exited edit mode
     expect(component.courses()[0].title).toBe('Azure 基礎');    // reverted to original
+  });
+
+  // ---- Bulk actions (multi-select checkbox column) ------------------
+
+  it('bulk-deletes the selected rows then reloads the list', () => {
+    init([makeRow(), { ...makeRow(), pkid: 2, title: '第二課' }]);
+    component.selectedCourses.set(component.courses()); // both rows ticked
+
+    const confirm = TestBed.inject(ConfirmationService);
+    spyOn(confirm, 'confirm').and.callFake((c) => {
+      c.accept?.();
+      return confirm;
+    });
+
+    component.confirmBulkDelete();
+
+    const d1 = http.expectOne(`${base}/api/courses/1`);
+    const d2 = http.expectOne(`${base}/api/courses/2`);
+    expect(d1.request.method).toBe('DELETE');
+    expect(d2.request.method).toBe('DELETE');
+    d1.flush(null);
+    d2.flush(null);
+
+    http.expectOne(`${base}/api/courses/query`).flush([]); // list reloaded
+    expect(component.selectedCourses().length).toBe(0);
+  });
+
+  it('does nothing when bulk delete is invoked with no selection', () => {
+    init();
+    component.selectedCourses.set([]);
+    component.confirmBulkDelete();
+    http.expectNone(`${base}/api/courses/1`);
+  });
+
+  it('exports the selected rows to a CSV download', () => {
+    init();
+    component.selectedCourses.set([component.courses()[0]]);
+
+    const createUrl = spyOn(URL, 'createObjectURL').and.returnValue('blob:fake');
+    spyOn(URL, 'revokeObjectURL');
+    const clickSpy = spyOn(HTMLAnchorElement.prototype, 'click');
+
+    component.exportSelected();
+
+    expect(createUrl).toHaveBeenCalledTimes(1);
+    expect(createUrl.calls.mostRecent().args[0] instanceof Blob).toBeTrue();
+    expect(clickSpy).toHaveBeenCalledTimes(1);
   });
 });

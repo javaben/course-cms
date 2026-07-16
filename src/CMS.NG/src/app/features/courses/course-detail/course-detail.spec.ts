@@ -7,6 +7,8 @@ import { providePrimeNG } from 'primeng/config';
 import { MessageService } from 'primeng/api';
 import Aura from '@primeng/themes/aura';
 import { environment } from '@env/environment';
+import { of } from 'rxjs';
+import { RowAuditService } from '@core/services/row-audit.service';
 
 import { CourseDetail } from './course-detail';
 
@@ -55,6 +57,7 @@ describe('CourseDetail', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: RowAuditService, useValue: { getForRecord: () => of([]) } },
         provideRouter([]),
         provideNoopAnimations(),
         providePrimeNG({ theme: { preset: Aura } }),

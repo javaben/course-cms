@@ -6,11 +6,12 @@ import { MessageService } from 'primeng/api';
 
 import { PartnerService } from '@core/services/partner.service';
 import { Partner } from '@core/models/partner.model';
+import { RowAuditBadge } from '@app/shared/row-audit-badge/row-audit-badge';
 
 @Component({
   selector: 'app-partner-detail',
   standalone: true,
-  imports: [ButtonModule],
+  imports: [ButtonModule, RowAuditBadge],
   templateUrl: './partner-detail.html',
   styleUrl: './partner-detail.scss',
 })

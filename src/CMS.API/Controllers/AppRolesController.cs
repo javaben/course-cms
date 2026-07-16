@@ -1,9 +1,14 @@
 using CMS.API.Models;
 using CMS.API.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CMS.API.Controllers;
 
+// Admin-only: roles carry PermissionLevel, so create/update/delete here is a privilege boundary.
+// The global fallback policy only requires *authentication*; without this any authenticated user
+// could edit roles. Mirrors the Admin gate on AuthController.reset-password.
+[Authorize(Roles = "Admin")]
 [ApiController]
 [Route("api/app-roles")]
 public class AppRolesController : ControllerBase

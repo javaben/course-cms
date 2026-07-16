@@ -159,6 +159,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('@features/app-users/app-user-detail/app-user-detail').then((m) => m.AppUserDetail),
       },
+      {
+        path: 'row-audits',
+        loadComponent: () =>
+          import('@features/row-audits/row-audit-list/row-audit-list').then((m) => m.RowAuditList),
+      },
       { path: '**', redirectTo: 'app-roles' },
     ],
   },

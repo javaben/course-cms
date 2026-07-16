@@ -14,6 +14,24 @@
         label="搜尋條件"
         (click)="drawerVisible.set(true)"
       ></button>
+      <button
+        type="button"
+        pButton
+        class="p-button-outlined"
+        icon="pi pi-download"
+        [label]="'匯出所選' + (selectedCourses().length ? ' (' + selectedCourses().length + ')' : '')"
+        [disabled]="selectedCourses().length === 0"
+        (click)="exportSelected()"
+      ></button>
+      <button
+        type="button"
+        pButton
+        class="p-button-outlined p-button-danger"
+        icon="pi pi-trash"
+        [label]="'刪除所選' + (selectedCourses().length ? ' (' + selectedCourses().length + ')' : '')"
+        [disabled]="selectedCourses().length === 0"
+        (click)="confirmBulkDelete()"
+      ></button>
       <button type="button" pButton class="p-button-success" icon="pi pi-plus" label="新增" (click)="add()"></button>
     </div>
   </div>
@@ -33,12 +51,15 @@
         [showCurrentPageReport]="true"
         currentPageReportTemplate="{first}–{last} 筆，共 {totalRecords} 筆"
         dataKey="pkid"
+        [selection]="selectedCourses()"
+        (selectionChange)="selectedCourses.set($event)"
         (onSort)="onSort($event)"
         (onPage)="onPage($event)"
         styleClass="p-datatable-sm p-datatable-gridlines"
       >
         <ng-template pTemplate="header">
           <tr>
+            <th style="width: 3rem" class="text-center"><p-tableHeaderCheckbox /></th>
             <th style="width: 5rem">主代碼</th>
             <th style="width: 6rem">顯示順序</th>
             <th style="width: 9rem">簡介代碼</th>
@@ -59,6 +80,9 @@
 
         <ng-template pTemplate="body" let-course>
           <tr>
+            <!-- multi-select checkbox -->
+            <td class="text-center"><p-tableCheckbox [value]="course" /></td>
+
             <!-- read-only: pkid -->
             <td>{{ course.pkid }}</td>
 
@@ -110,7 +134,7 @@
             <!-- publishStatusPkid (dropdown) -->
             <td class="editable" data-field="publishStatusPkid" (dblclick)="startEdit(course, 'publishStatusPkid')">
               @if (isEditing(course, 'publishStatusPkid')) {
-                <p-select [options]="publishStatuses()" [(ngModel)]="editValue" optionLabel="label" optionValue="pkid" appendTo="body" styleClass="cell-editor" (onChange)="commit(course, 'publishStatusPkid')" (onBlur)="commit(course, 'publishStatusPkid')" />
+                <p-select [options]="publishStatuses()" [(ngModel)]="editValue" optionLabel="label" optionValue="pkid" appendTo="body" styleClass="cell-editor" (onChange)="commit(course, 'publishStatusPkid')" />
                 @if (editError()) { <small class="cell-error">{{ editError() }}</small> }
               } @else {
                 {{ course.publishStatus?.label || '—' }}
@@ -187,7 +211,7 @@
 
         <ng-template pTemplate="emptymessage">
           <tr>
-            <td colspan="15" class="text-center text-muted">查無資料</td>
+            <td colspan="16" class="text-center text-muted">查無資料</td>
           </tr>
         </ng-template>
       </p-table>

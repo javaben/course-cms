@@ -16,6 +16,7 @@ import { AuthService } from '@core/services/auth.service';
 import { LookupService } from '@core/services/lookup.service';
 import { AppUser, AppUserRequest } from '@core/models/app-user.model';
 import { AppRoleLookup } from '@core/models/app-role-lookup.model';
+import { RowAuditBadge } from '@app/shared/row-audit-badge/row-audit-badge';
 
 @Component({
   selector: 'app-app-user-form',
@@ -27,6 +28,7 @@ import { AppRoleLookup } from '@core/models/app-role-lookup.model';
     InputTextModule,
     CheckboxModule,
     MultiSelectModule,
+    RowAuditBadge,
   ],
   templateUrl: './app-user-form.html',
   styleUrl: './app-user-form.scss',
@@ -49,6 +51,9 @@ export class AppUserForm implements OnInit {
   readonly saving = signal(false);
   readonly roles = signal<AppRoleLookup[]>([]);
   readonly passwordUpdatedTime = signal<string | null>(null);
+
+  /** The record's pkid (int) for the audit badge; null until an existing user is loaded. */
+  readonly auditPkid = signal<number | null>(null);
 
   private userId: string | null = null;
 
@@ -78,6 +83,7 @@ export class AppUserForm implements OnInit {
           });
           this.form.controls.userId.disable(); // UserId is the PK — immutable on edit.
           this.passwordUpdatedTime.set(user.passwordUpdatedTime ?? null);
+          this.auditPkid.set(user.pkid);
         }
         this.loading.set(false);
       },

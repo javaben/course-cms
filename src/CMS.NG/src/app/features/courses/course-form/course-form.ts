@@ -22,6 +22,7 @@ import { CourseGroupLookup } from '@core/models/course-group-lookup.model';
 import { PublishStatusLookup } from '@core/models/publish-status-lookup.model';
 import { CertificationLookup } from '@core/models/certification-lookup.model';
 import { JobCategoryLookup } from '@core/models/job-category-lookup.model';
+import { RowAuditBadge } from '@app/shared/row-audit-badge/row-audit-badge';
 import { addYears, fromIso, toIso } from './course-date.util';
 
 type RequiredControl =
@@ -51,6 +52,7 @@ type RequiredControl =
     MultiSelectModule,
     DatePickerModule,
     CheckboxModule,
+    RowAuditBadge,
   ],
   templateUrl: './course-form.html',
   styleUrl: './course-form.scss',

@@ -11,11 +11,12 @@ import { AppUserService } from '@core/services/app-user.service';
 import { LookupService } from '@core/services/lookup.service';
 import { AppUser } from '@core/models/app-user.model';
 import { AppRoleLookup } from '@core/models/app-role-lookup.model';
+import { RowAuditBadge } from '@app/shared/row-audit-badge/row-audit-badge';
 
 @Component({
   selector: 'app-app-user-detail',
   standalone: true,
-  imports: [DatePipe, ButtonModule, TagModule],
+  imports: [DatePipe, ButtonModule, TagModule, RowAuditBadge],
   templateUrl: './app-user-detail.html',
   styleUrl: './app-user-detail.scss',
 })

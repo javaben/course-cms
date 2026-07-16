@@ -12,6 +12,7 @@ import { MessageService } from 'primeng/api';
 
 import { PublishStatusService } from '@core/services/publish-status.service';
 import { PublishStatus, PublishStatusRequest } from '@core/models/publish-status.model';
+import { RowAuditBadge } from '@app/shared/row-audit-badge/row-audit-badge';
 
 @Component({
   selector: 'app-publish-status-form',
@@ -22,6 +23,7 @@ import { PublishStatus, PublishStatusRequest } from '@core/models/publish-status
     InputTextModule,
     InputNumberModule,
     CheckboxModule,
+    RowAuditBadge,
   ],
   templateUrl: './publish-status-form.html',
   styleUrl: './publish-status-form.scss',
@@ -38,6 +40,9 @@ export class PublishStatusForm implements OnInit {
   readonly saving = signal(false);
 
   private pkid: number | null = null;
+
+  /** The record's pkid for the audit badge; null until an existing status is loaded. */
+  readonly auditPkid = signal<number | null>(null);
 
   readonly form = this.fb.nonNullable.group({
     pkid: [0, [Validators.required, Validators.min(0), Validators.max(255)]],
@@ -63,6 +68,7 @@ export class PublishStatusForm implements OnInit {
             isDiscontinued: status.isDiscontinued,
           });
           this.form.controls.pkid.disable(); // pkid is the PK — immutable on edit.
+          this.auditPkid.set(status.pkid);
           this.loading.set(false);
         },
         error: () => {
