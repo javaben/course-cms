@@ -1,5 +1,12 @@
 # Code Generation Patterns
 
+## Sources & templates (read before generating a table)
+
+- **`database/*.sql`** — raw `CREATE TABLE` schema; source of truth for columns and types.
+- Per-feature build specs follow **`spec/feature-spec.template.md`**. Worked examples:
+  **`spec/sample1.spec.md`** (Course — FK multi-map + N-N) and **`spec/sample2.spec.md`**
+  (SkillTrain — N-N). `spec/ui-sample-*.png` are visual refs.
+
 ## Backend
 
   ### Models
