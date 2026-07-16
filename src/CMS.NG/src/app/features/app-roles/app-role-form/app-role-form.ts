@@ -14,6 +14,7 @@ import { AppRoleService } from '@core/services/app-role.service';
 import { LookupService } from '@core/services/lookup.service';
 import { AppRole, AppRoleRequest } from '@core/models/app-role.model';
 import { AppUserLookup } from '@core/models/app-user-lookup.model';
+import { RowAuditBadge } from '@app/shared/row-audit-badge/row-audit-badge';
 
 @Component({
   selector: 'app-app-role-form',
@@ -24,6 +25,7 @@ import { AppUserLookup } from '@core/models/app-user-lookup.model';
     InputTextModule,
     InputNumberModule,
     MultiSelectModule,
+    RowAuditBadge,
   ],
   templateUrl: './app-role-form.html',
   styleUrl: './app-role-form.scss',
@@ -40,6 +42,9 @@ export class AppRoleForm implements OnInit {
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly users = signal<AppUserLookup[]>([]);
+
+  /** The record's pkid (int) for the audit badge; null until an existing role is loaded. */
+  readonly auditPkid = signal<number | null>(null);
 
   private roleId: string | null = null;
 
@@ -69,6 +74,7 @@ export class AppRoleForm implements OnInit {
             description: role.description ?? null,
             userIds: role.userIds,
           });
+          this.auditPkid.set(role.pkid);
           this.form.controls.roleId.disable(); // RoleId is the PK — immutable on edit.
         }
         this.loading.set(false);

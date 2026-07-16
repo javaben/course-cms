@@ -6,11 +6,12 @@ import { MessageService } from 'primeng/api';
 
 import { CourseGroupService } from '@core/services/course-group.service';
 import { CourseGroup } from '@core/models/course-group.model';
+import { RowAuditBadge } from '@app/shared/row-audit-badge/row-audit-badge';
 
 @Component({
   selector: 'app-course-group-detail',
   standalone: true,
-  imports: [ButtonModule],
+  imports: [ButtonModule, RowAuditBadge],
   templateUrl: './course-group-detail.html',
   styleUrl: './course-group-detail.scss',
 })

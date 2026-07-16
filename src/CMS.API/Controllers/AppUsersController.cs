@@ -1,9 +1,14 @@
 using CMS.API.Models;
 using CMS.API.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CMS.API.Controllers;
 
+// Admin-only: user management (create/update roles via RoleIds, delete, password reset) is a
+// privilege-escalation surface. The global fallback policy only requires *authentication*, so
+// without this a non-admin could grant themselves the Admin role or reset an admin's password.
+[Authorize(Roles = "Admin")]
 [ApiController]
 [Route("api/app-users")]
 public class AppUsersController : ControllerBase

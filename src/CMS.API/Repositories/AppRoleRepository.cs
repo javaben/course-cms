@@ -7,11 +7,15 @@ namespace CMS.API.Repositories;
 
 public sealed class AppRoleRepository : IAppRoleRepository
 {
-    private readonly IDbConnectionFactory _factory;
+    private const string TableName = "AppRole";
 
-    public AppRoleRepository(IDbConnectionFactory factory)
+    private readonly IDbConnectionFactory _factory;
+    private readonly IRowAuditWriter _audit;
+
+    public AppRoleRepository(IDbConnectionFactory factory, IRowAuditWriter audit)
     {
         _factory = factory;
+        _audit = audit;
     }
 
     private const string SelectColumns = @"
@@ -59,15 +63,21 @@ public sealed class AppRoleRepository : IAppRoleRepository
     public async Task<AppRole?> GetByIdAsync(string roleId, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        return await LoadAsync(conn, null, roleId, ct);
+    }
 
+    /// <summary>Loads one role (+ its UserIds) on the given connection/transaction, for audit snapshots.</summary>
+    private static async Task<AppRole?> LoadAsync(
+        IDbConnection conn, IDbTransaction? tx, string roleId, CancellationToken ct)
+    {
         var sql = $"{SelectColumns} WHERE r.RoleId = @RoleId";
         var role = await conn.QuerySingleOrDefaultAsync<AppRole>(
-            new CommandDefinition(sql, new { RoleId = roleId }, cancellationToken: ct));
+            new CommandDefinition(sql, new { RoleId = roleId }, tx, cancellationToken: ct));
         if (role is null) return null;
 
         var userIds = await conn.QueryAsync<string>(new CommandDefinition(
             "SELECT UserId FROM AppUserRole WHERE RoleId = @RoleId ORDER BY UserId",
-            new { RoleId = roleId }, cancellationToken: ct));
+            new { RoleId = roleId }, tx, cancellationToken: ct));
         role.UserIds = userIds.AsList();
         return role;
     }
@@ -92,9 +102,12 @@ public sealed class AppRoleRepository : IAppRoleRepository
             request, tx, cancellationToken: ct));
 
         await SyncUsersAsync(conn, tx, request.RoleId, request.UserIds, ct);
-        tx.Commit();
 
-        return (await GetByIdAsync(request.RoleId, ct))!;
+        var created = (await LoadAsync(conn, tx, request.RoleId, ct))!;
+        await _audit.LogInsertAsync(conn, tx, TableName, created, ct);
+
+        tx.Commit();
+        return created;
     }
 
     public async Task<bool> UpdateAsync(AppRoleRequest request, CancellationToken ct = default)
@@ -102,7 +115,10 @@ public sealed class AppRoleRepository : IAppRoleRepository
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
         using var tx = conn.BeginTransaction();
 
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
+        var before = await LoadAsync(conn, tx, request.RoleId, ct);
+        if (before is null) { tx.Rollback(); return false; }
+
+        await conn.ExecuteAsync(new CommandDefinition(
             @"UPDATE AppRole
                  SET RoleName        = @RoleName,
                      PermissionLevel = @PermissionLevel,
@@ -110,13 +126,11 @@ public sealed class AppRoleRepository : IAppRoleRepository
                WHERE RoleId = @RoleId;",
             request, tx, cancellationToken: ct));
 
-        if (affected == 0)
-        {
-            tx.Rollback();
-            return false;
-        }
-
         await SyncUsersAsync(conn, tx, request.RoleId, request.UserIds, ct);
+
+        var after = (await LoadAsync(conn, tx, request.RoleId, ct))!;
+        await _audit.LogUpdateAsync(conn, tx, TableName, before, after, ct);
+
         tx.Commit();
         return true;
     }
@@ -126,17 +140,22 @@ public sealed class AppRoleRepository : IAppRoleRepository
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
         using var tx = conn.BeginTransaction();
 
+        var before = await LoadAsync(conn, tx, roleId, ct);
+        if (before is null) { tx.Rollback(); return false; }
+
         // Remove n-n rows first (FK), then the role.
         await conn.ExecuteAsync(new CommandDefinition(
             "DELETE FROM AppUserRole WHERE RoleId = @RoleId",
             new { RoleId = roleId }, tx, cancellationToken: ct));
 
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
+        await conn.ExecuteAsync(new CommandDefinition(
             "DELETE FROM AppRole WHERE RoleId = @RoleId",
             new { RoleId = roleId }, tx, cancellationToken: ct));
 
+        await _audit.LogDeleteAsync(conn, tx, TableName, before, ct);
+
         tx.Commit();
-        return affected > 0;
+        return true;
     }
 
     /// <summary>n-n sync: delete-then-reinsert AppUserRole rows for the role.</summary>

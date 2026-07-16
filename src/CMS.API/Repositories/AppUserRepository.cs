@@ -8,11 +8,15 @@ namespace CMS.API.Repositories;
 
 public sealed class AppUserRepository : IAppUserRepository
 {
-    private readonly IDbConnectionFactory _factory;
+    private const string TableName = "AppUser";
 
-    public AppUserRepository(IDbConnectionFactory factory)
+    private readonly IDbConnectionFactory _factory;
+    private readonly IRowAuditWriter _audit;
+
+    public AppUserRepository(IDbConnectionFactory factory, IRowAuditWriter audit)
     {
         _factory = factory;
+        _audit = audit;
     }
 
     // PasswordHash is deliberately excluded from every SELECT — never returned to the client.
@@ -61,15 +65,21 @@ public sealed class AppUserRepository : IAppUserRepository
     public async Task<AppUser?> GetByIdAsync(string userId, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        return await LoadAsync(conn, null, userId, ct);
+    }
 
+    /// <summary>Loads one user (+ its RoleIds) on the given connection/transaction, for audit snapshots.</summary>
+    private static async Task<AppUser?> LoadAsync(
+        IDbConnection conn, IDbTransaction? tx, string userId, CancellationToken ct)
+    {
         var sql = $"{SelectColumns} WHERE u.UserId = @UserId";
         var user = await conn.QuerySingleOrDefaultAsync<AppUser>(
-            new CommandDefinition(sql, new { UserId = userId }, cancellationToken: ct));
+            new CommandDefinition(sql, new { UserId = userId }, tx, cancellationToken: ct));
         if (user is null) return null;
 
         var roleIds = await conn.QueryAsync<string>(new CommandDefinition(
             "SELECT RoleId FROM AppUserRole WHERE UserId = @UserId ORDER BY RoleId",
-            new { UserId = userId }, cancellationToken: ct));
+            new { UserId = userId }, tx, cancellationToken: ct));
         user.RoleIds = roleIds.AsList();
         return user;
     }
@@ -105,9 +115,12 @@ public sealed class AppUserRepository : IAppUserRepository
             tx, cancellationToken: ct));
 
         await SyncRolesAsync(conn, tx, request.UserId, request.RoleIds, ct);
-        tx.Commit();
 
-        return (await GetByIdAsync(request.UserId, ct))!;
+        var created = (await LoadAsync(conn, tx, request.UserId, ct))!;
+        await _audit.LogInsertAsync(conn, tx, TableName, created, ct);
+
+        tx.Commit();
+        return created;
     }
 
     public async Task<bool> UpdateAsync(AppUserRequest request, CancellationToken ct = default)
@@ -115,21 +128,22 @@ public sealed class AppUserRepository : IAppUserRepository
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
         using var tx = conn.BeginTransaction();
 
+        var before = await LoadAsync(conn, tx, request.UserId, ct);
+        if (before is null) { tx.Rollback(); return false; }
+
         // PasswordHash / PasswordUpdatedTime deliberately untouched — only reset-password changes them.
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
+        await conn.ExecuteAsync(new CommandDefinition(
             @"UPDATE AppUser
                  SET UserName = @UserName,
                      IsActive = @IsActive
                WHERE UserId = @UserId;",
             new { request.UserId, request.UserName, request.IsActive }, tx, cancellationToken: ct));
 
-        if (affected == 0)
-        {
-            tx.Rollback();
-            return false;
-        }
-
         await SyncRolesAsync(conn, tx, request.UserId, request.RoleIds, ct);
+
+        var after = (await LoadAsync(conn, tx, request.UserId, ct))!;
+        await _audit.LogUpdateAsync(conn, tx, TableName, before, after, ct);
+
         tx.Commit();
         return true;
     }
@@ -139,17 +153,22 @@ public sealed class AppUserRepository : IAppUserRepository
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
         using var tx = conn.BeginTransaction();
 
+        var before = await LoadAsync(conn, tx, userId, ct);
+        if (before is null) { tx.Rollback(); return false; }
+
         // Remove n-n rows first (FK), then the user.
         await conn.ExecuteAsync(new CommandDefinition(
             "DELETE FROM AppUserRole WHERE UserId = @UserId",
             new { UserId = userId }, tx, cancellationToken: ct));
 
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
+        await conn.ExecuteAsync(new CommandDefinition(
             "DELETE FROM AppUser WHERE UserId = @UserId",
             new { UserId = userId }, tx, cancellationToken: ct));
 
+        await _audit.LogDeleteAsync(conn, tx, TableName, before, ct);
+
         tx.Commit();
-        return affected > 0;
+        return true;
     }
 
     public async Task<bool> ResetPasswordAsync(string userId, CancellationToken ct = default)

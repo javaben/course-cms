@@ -7,6 +7,8 @@ import { providePrimeNG } from 'primeng/config';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import Aura from '@primeng/themes/aura';
 import { environment } from '@env/environment';
+import { of } from 'rxjs';
+import { RowAuditService } from '@core/services/row-audit.service';
 
 import { AppUserForm } from './app-user-form';
 import { AuthService } from '@core/services/auth.service';
@@ -51,6 +53,7 @@ function configure(id: string | null): {
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
+      { provide: RowAuditService, useValue: { getForRecord: () => of([]) } },
       provideRouter([]),
       provideNoopAnimations(),
       providePrimeNG({ theme: { preset: Aura } }),

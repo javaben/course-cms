@@ -3,6 +3,7 @@
   <div class="page-header">
     <h1 class="title">檢視使用者</h1>
     <div class="actions">
+      <app-row-audit-badge [tableName]="'AppUser'" [pkid]="user()?.pkid ?? null"></app-row-audit-badge>
       <button type="button" pButton class="p-button-outlined" icon="pi pi-arrow-left" label="返回" (click)="back()"></button>
       <button type="button" pButton class="p-button-warning" icon="pi pi-key" label="重設密碼" (click)="confirmResetPassword()"></button>
       <button type="button" pButton class="p-button-success" icon="pi pi-pencil" label="編輯" (click)="edit()"></button>

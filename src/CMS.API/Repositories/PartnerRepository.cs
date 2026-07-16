@@ -1,3 +1,4 @@
+using System.Data;
 using CMS.API.Infrastructure;
 using CMS.API.Models;
 using Dapper;
@@ -6,11 +7,15 @@ namespace CMS.API.Repositories;
 
 public sealed class PartnerRepository : IPartnerRepository
 {
-    private readonly IDbConnectionFactory _factory;
+    private const string TableName = "Partner";
 
-    public PartnerRepository(IDbConnectionFactory factory)
+    private readonly IDbConnectionFactory _factory;
+    private readonly IRowAuditWriter _audit;
+
+    public PartnerRepository(IDbConnectionFactory factory, IRowAuditWriter audit)
     {
         _factory = factory;
+        _audit = audit;
     }
 
     private const string SelectColumns = @"
@@ -56,27 +61,45 @@ public sealed class PartnerRepository : IPartnerRepository
     public async Task<Partner?> GetByIdAsync(short pkid, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        return await LoadAsync(conn, null, pkid, ct);
+    }
+
+    /// <summary>Loads one row on the given connection/transaction (used for audit before/after snapshots).</summary>
+    private static async Task<Partner?> LoadAsync(
+        IDbConnection conn, IDbTransaction? tx, short pkid, CancellationToken ct)
+    {
         var sql = $"{SelectColumns} WHERE p.pkid = @Pkid";
         return await conn.QuerySingleOrDefaultAsync<Partner>(
-            new CommandDefinition(sql, new { Pkid = pkid }, cancellationToken: ct));
+            new CommandDefinition(sql, new { Pkid = pkid }, tx, cancellationToken: ct));
     }
 
     public async Task<Partner> CreateAsync(PartnerRequest request, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        using var tx = conn.BeginTransaction();
+
         var newId = await conn.ExecuteScalarAsync<short>(new CommandDefinition(
             @"INSERT INTO Partner (Name, AppKey, NameOnPartnerMenu, NameOnCourseDetailPage, DisplayOrder, ImageFilename)
               VALUES (@Name, @AppKey, @NameOnPartnerMenu, @NameOnCourseDetailPage, @DisplayOrder, @ImageFilename);
               SELECT CAST(SCOPE_IDENTITY() AS smallint);",
-            request, cancellationToken: ct));
+            request, tx, cancellationToken: ct));
 
-        return (await GetByIdAsync(newId, ct))!;
+        var created = (await LoadAsync(conn, tx, newId, ct))!;
+        await _audit.LogInsertAsync(conn, tx, TableName, created, ct);
+
+        tx.Commit();
+        return created;
     }
 
     public async Task<bool> UpdateAsync(PartnerRequest request, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
+        using var tx = conn.BeginTransaction();
+
+        var before = await LoadAsync(conn, tx, request.Pkid, ct);
+        if (before is null) { tx.Rollback(); return false; }
+
+        await conn.ExecuteAsync(new CommandDefinition(
             @"UPDATE Partner
                  SET Name                   = @Name,
                      AppKey                 = @AppKey,
@@ -85,16 +108,30 @@ public sealed class PartnerRepository : IPartnerRepository
                      DisplayOrder           = @DisplayOrder,
                      ImageFilename          = @ImageFilename
                WHERE pkid = @Pkid;",
-            request, cancellationToken: ct));
-        return affected > 0;
+            request, tx, cancellationToken: ct));
+
+        var after = (await LoadAsync(conn, tx, request.Pkid, ct))!;
+        await _audit.LogUpdateAsync(conn, tx, TableName, before, after, ct);
+
+        tx.Commit();
+        return true;
     }
 
     public async Task<bool> DeleteAsync(short pkid, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
+        using var tx = conn.BeginTransaction();
+
+        var before = await LoadAsync(conn, tx, pkid, ct);
+        if (before is null) { tx.Rollback(); return false; }
+
+        await conn.ExecuteAsync(new CommandDefinition(
             "DELETE FROM Partner WHERE pkid = @Pkid",
-            new { Pkid = pkid }, cancellationToken: ct));
-        return affected > 0;
+            new { Pkid = pkid }, tx, cancellationToken: ct));
+
+        await _audit.LogDeleteAsync(conn, tx, TableName, before, ct);
+
+        tx.Commit();
+        return true;
     }
 }

@@ -1,3 +1,4 @@
+using System.Data;
 using CMS.API.Infrastructure;
 using CMS.API.Models;
 using Dapper;
@@ -6,11 +7,15 @@ namespace CMS.API.Repositories;
 
 public sealed class CourseGroupRepository : ICourseGroupRepository
 {
-    private readonly IDbConnectionFactory _factory;
+    private const string TableName = "CourseGroup";
 
-    public CourseGroupRepository(IDbConnectionFactory factory)
+    private readonly IDbConnectionFactory _factory;
+    private readonly IRowAuditWriter _audit;
+
+    public CourseGroupRepository(IDbConnectionFactory factory, IRowAuditWriter audit)
     {
         _factory = factory;
+        _audit = audit;
     }
 
     private const string SelectColumns = @"
@@ -48,37 +53,69 @@ public sealed class CourseGroupRepository : ICourseGroupRepository
     public async Task<CourseGroup?> GetByIdAsync(short pkid, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        return await LoadAsync(conn, null, pkid, ct);
+    }
+
+    /// <summary>Loads one row on the given connection/transaction (used for audit before/after snapshots).</summary>
+    private static async Task<CourseGroup?> LoadAsync(
+        IDbConnection conn, IDbTransaction? tx, short pkid, CancellationToken ct)
+    {
         var sql = $"{SelectColumns} WHERE g.pkid = @Pkid";
         return await conn.QuerySingleOrDefaultAsync<CourseGroup>(
-            new CommandDefinition(sql, new { Pkid = pkid }, cancellationToken: ct));
+            new CommandDefinition(sql, new { Pkid = pkid }, tx, cancellationToken: ct));
     }
 
     public async Task<CourseGroup> CreateAsync(CourseGroupRequest request, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        using var tx = conn.BeginTransaction();
+
         var newId = await conn.ExecuteScalarAsync<short>(new CommandDefinition(
             @"INSERT INTO CourseGroup (Description) VALUES (@Description);
               SELECT CAST(SCOPE_IDENTITY() AS smallint);",
-            request, cancellationToken: ct));
+            request, tx, cancellationToken: ct));
 
-        return (await GetByIdAsync(newId, ct))!;
+        var created = (await LoadAsync(conn, tx, newId, ct))!;
+        await _audit.LogInsertAsync(conn, tx, TableName, created, ct);
+
+        tx.Commit();
+        return created;
     }
 
     public async Task<bool> UpdateAsync(CourseGroupRequest request, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
+        using var tx = conn.BeginTransaction();
+
+        var before = await LoadAsync(conn, tx, request.Pkid, ct);
+        if (before is null) { tx.Rollback(); return false; }
+
+        await conn.ExecuteAsync(new CommandDefinition(
             "UPDATE CourseGroup SET Description = @Description WHERE pkid = @Pkid;",
-            request, cancellationToken: ct));
-        return affected > 0;
+            request, tx, cancellationToken: ct));
+
+        var after = (await LoadAsync(conn, tx, request.Pkid, ct))!;
+        await _audit.LogUpdateAsync(conn, tx, TableName, before, after, ct);
+
+        tx.Commit();
+        return true;
     }
 
     public async Task<bool> DeleteAsync(short pkid, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
+        using var tx = conn.BeginTransaction();
+
+        var before = await LoadAsync(conn, tx, pkid, ct);
+        if (before is null) { tx.Rollback(); return false; }
+
+        await conn.ExecuteAsync(new CommandDefinition(
             "DELETE FROM CourseGroup WHERE pkid = @Pkid",
-            new { Pkid = pkid }, cancellationToken: ct));
-        return affected > 0;
+            new { Pkid = pkid }, tx, cancellationToken: ct));
+
+        await _audit.LogDeleteAsync(conn, tx, TableName, before, ct);
+
+        tx.Commit();
+        return true;
     }
 }

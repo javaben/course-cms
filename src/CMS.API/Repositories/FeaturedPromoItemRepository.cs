@@ -7,11 +7,15 @@ namespace CMS.API.Repositories;
 
 public sealed class FeaturedPromoItemRepository : IFeaturedPromoItemRepository
 {
-    private readonly IDbConnectionFactory _factory;
+    private const string TableName = "FeaturedPromoItem";
 
-    public FeaturedPromoItemRepository(IDbConnectionFactory factory)
+    private readonly IDbConnectionFactory _factory;
+    private readonly IRowAuditWriter _audit;
+
+    public FeaturedPromoItemRepository(IDbConnectionFactory factory, IRowAuditWriter audit)
     {
         _factory = factory;
+        _audit = audit;
     }
 
     // PromoCode is joined in from Promotion2 (the FK target) for display.
@@ -56,9 +60,16 @@ public sealed class FeaturedPromoItemRepository : IFeaturedPromoItemRepository
     public async Task<FeaturedPromoItem?> GetByIdAsync(int pkid, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        return await LoadAsync(conn, null, pkid, ct);
+    }
+
+    /// <summary>Loads one row on the given connection/transaction (used for audit before/after snapshots).</summary>
+    private static async Task<FeaturedPromoItem?> LoadAsync(
+        IDbConnection conn, IDbTransaction? tx, int pkid, CancellationToken ct)
+    {
         var sql = $"{SelectColumns} WHERE f.pkid = @Pkid";
         return await conn.QuerySingleOrDefaultAsync<FeaturedPromoItem>(
-            new CommandDefinition(sql, new { Pkid = pkid }, cancellationToken: ct));
+            new CommandDefinition(sql, new { Pkid = pkid }, tx, cancellationToken: ct));
     }
 
     public async Task<bool> SlotTakenAsync(DateOnly scheduleOn, short trainingCenterPkid, byte slot, int? excludePkid = null, CancellationToken ct = default)
@@ -79,19 +90,30 @@ public sealed class FeaturedPromoItemRepository : IFeaturedPromoItemRepository
     public async Task<FeaturedPromoItem> CreateAsync(FeaturedPromoItemRequest request, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
+        using var tx = conn.BeginTransaction();
+
         var newId = await conn.ExecuteScalarAsync<int>(new CommandDefinition(
             @"INSERT INTO FeaturedPromoItem (ScheduleOn, TrainingCenter_pkid, Slot, Promotion_pkid, Topic, Description)
               VALUES (@ScheduleOn, @TrainingCenterPkid, @Slot, @PromotionPkid, @Topic, @Description);
               SELECT CAST(SCOPE_IDENTITY() AS int);",
-            request, cancellationToken: ct));
+            request, tx, cancellationToken: ct));
 
-        return (await GetByIdAsync(newId, ct))!;
+        var created = (await LoadAsync(conn, tx, newId, ct))!;
+        await _audit.LogInsertAsync(conn, tx, TableName, created, ct);
+
+        tx.Commit();
+        return created;
     }
 
     public async Task<bool> UpdateAsync(FeaturedPromoItemRequest request, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
+        using var tx = conn.BeginTransaction();
+
+        var before = await LoadAsync(conn, tx, request.Pkid, ct);
+        if (before is null) { tx.Rollback(); return false; }
+
+        await conn.ExecuteAsync(new CommandDefinition(
             @"UPDATE FeaturedPromoItem
                  SET ScheduleOn          = @ScheduleOn,
                      TrainingCenter_pkid = @TrainingCenterPkid,
@@ -100,17 +122,31 @@ public sealed class FeaturedPromoItemRepository : IFeaturedPromoItemRepository
                      Topic               = @Topic,
                      Description         = @Description
                WHERE pkid = @Pkid;",
-            request, cancellationToken: ct));
-        return affected > 0;
+            request, tx, cancellationToken: ct));
+
+        var after = (await LoadAsync(conn, tx, request.Pkid, ct))!;
+        await _audit.LogUpdateAsync(conn, tx, TableName, before, after, ct);
+
+        tx.Commit();
+        return true;
     }
 
     public async Task<bool> DeleteAsync(int pkid, CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
+        using var tx = conn.BeginTransaction();
+
+        var before = await LoadAsync(conn, tx, pkid, ct);
+        if (before is null) { tx.Rollback(); return false; }
+
+        await conn.ExecuteAsync(new CommandDefinition(
             "DELETE FROM FeaturedPromoItem WHERE pkid = @Pkid",
-            new { Pkid = pkid }, cancellationToken: ct));
-        return affected > 0;
+            new { Pkid = pkid }, tx, cancellationToken: ct));
+
+        await _audit.LogDeleteAsync(conn, tx, TableName, before, ct);
+
+        tx.Commit();
+        return true;
     }
 
     public async Task<bool> MoveSlotAsync(int pkid, int direction, CancellationToken ct = default)

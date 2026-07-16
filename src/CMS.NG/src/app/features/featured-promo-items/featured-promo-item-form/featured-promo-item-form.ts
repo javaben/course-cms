@@ -6,6 +6,8 @@ import { Observable } from 'rxjs';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageService } from 'primeng/api';
 
+import { RowAuditBadge } from '@app/shared/row-audit-badge/row-audit-badge';
+
 import { FeaturedPromoItemService } from '@core/services/featured-promo-item.service';
 import { LookupService } from '@core/services/lookup.service';
 import {
@@ -35,7 +37,7 @@ export interface FormSeed {
 @Component({
   selector: 'app-featured-promo-item-form',
   standalone: true,
-  imports: [ReactiveFormsModule, InputTextModule],
+  imports: [ReactiveFormsModule, InputTextModule, RowAuditBadge],
   templateUrl: './featured-promo-item-form.html',
   styleUrl: './featured-promo-item-form.scss',
 })

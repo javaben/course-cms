@@ -1,0 +1,49 @@
+<button
+  type="button"
+  pButton
+  class="p-button-outlined p-button-sm audit-badge"
+  icon="pi pi-history"
+  (click)="open()"
+>
+  <span class="audit-label">異動紀錄 History</span>
+  @if (loaded()) {
+    @if (latest()) {
+      <span class="audit-latest">{{ latestSummary() }}</span>
+    } @else {
+      <span class="audit-empty">尚無異動紀錄 No history</span>
+    }
+  }
+</button>
+
+<p-dialog
+  header="異動紀錄 History"
+  [modal]="true"
+  [style]="{ width: '640px' }"
+  [visible]="dialogVisible()"
+  (visibleChange)="dialogVisible.set($event)"
+>
+  @if (hasHistory()) {
+    <table class="audit-table">
+      <thead>
+        <tr>
+          <th>時間 DateTime</th>
+          <th>使用者 User</th>
+          <th>動作 Action</th>
+          <th>說明 Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (e of entries(); track $index) {
+          <tr>
+            <td class="audit-when">{{ formatDate(e.dateTime) }}</td>
+            <td>{{ e.userName }}</td>
+            <td>{{ e.actionType }}</td>
+            <td>{{ e.actionDesc || '—' }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  } @else {
+    <p class="audit-empty-state">尚無異動紀錄 No history yet</p>
+  }
+</p-dialog>

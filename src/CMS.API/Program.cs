@@ -42,6 +42,12 @@ builder.Services.AddCors(options =>
 // Data access — Dapper (no EF).
 builder.Services.AddSingleton<IDbConnectionFactory>(
     new SqlConnectionFactory(builder.Configuration.GetConnectionString("CMS")!));
+
+// Cross-cutting row audit — repositories call it after Insert/Update/Delete. Needs the current
+// request to read the signed-in UserName from the JWT.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IRowAuditWriter, RowAuditWriter>();
+builder.Services.AddScoped<IRowAuditRepository, RowAuditRepository>();
 builder.Services.AddScoped<IAppRoleRepository, AppRoleRepository>();
 builder.Services.AddScoped<IAppUserRepository, AppUserRepository>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
@@ -95,6 +101,9 @@ builder.Services.AddAuthorization(options =>
 var app = builder.Build();
 
 // --- Pipeline ------------------------------------------------------------
+
+// Outermost: turn any unhandled exception into a safe, logged 500 (never leaks stack/SQL).
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseSwagger();
 app.UseSwaggerUI(options =>
