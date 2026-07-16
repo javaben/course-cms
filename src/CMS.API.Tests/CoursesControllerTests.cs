@@ -1,5 +1,6 @@
 using CMS.API.Controllers;
 using CMS.API.Models;
+using CMS.API.Services;
 using CMS.API.Tests.Fakes;
 using Microsoft.AspNetCore.Mvc;
 
@@ -32,7 +33,19 @@ public class CoursesControllerTests
                     LearningCredit = 5m, CanRepeat = false,
                 });
 
-    private static CoursesController Controller(InMemoryCourseRepository repo) => new(repo);
+    // Certifications the seeded course 1 points at (pkids 10, 11), plus an unrelated row.
+    private static InMemoryLookupRepository SeededLookups() =>
+        new InMemoryLookupRepository().SeedCertifications(
+            new CertificationLookup { Pkid = 10, Label = "微軟 - AZ-900" },
+            new CertificationLookup { Pkid = 11, Label = "微軟 - AZ-104" },
+            new CertificationLookup { Pkid = 99, Label = "甲骨文 - OCP" });
+
+    private static readonly ICoursePdfService Pdf = new CoursePdfService("https://test.example.com");
+
+    private static CoursesController Controller(InMemoryCourseRepository repo) => new(repo, SeededLookups(), Pdf);
+
+    private static CoursesController Controller(InMemoryCourseRepository repo, InMemoryLookupRepository lookups)
+        => new(repo, lookups, Pdf);
 
     private static IReadOnlyList<Course> Rows(ActionResult<IReadOnlyList<Course>> result)
     {
@@ -135,6 +148,38 @@ public class CoursesControllerTests
     {
         var result = await Controller(SeededRepo()).GetById(99, CancellationToken.None);
         Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    // ---- PDF flyer -----------------------------------------------------
+
+    [Fact]
+    public async Task GetPdf_returns_application_pdf_file_for_known_course()
+    {
+        var result = await Controller(SeededRepo()).GetPdf(1, CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("application/pdf", file.ContentType);
+        Assert.Equal("course-1.pdf", file.FileDownloadName);
+        Assert.StartsWith("%PDF", System.Text.Encoding.ASCII.GetString(file.FileContents, 0, 4));
+        Assert.True(file.FileContents.Length > 15_000, "CJK flyer should embed glyph data (size floor)");
+    }
+
+    [Fact]
+    public async Task GetPdf_returns_404_when_missing()
+    {
+        var result = await Controller(SeededRepo()).GetPdf(99, CancellationToken.None);
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task GetPdf_still_succeeds_when_certifications_lookup_is_empty()
+    {
+        // No cert rows seeded → labels resolve to empty; the flyer must still render (section hidden).
+        var result = await Controller(SeededRepo(), new InMemoryLookupRepository()).GetPdf(1, CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("application/pdf", file.ContentType);
+        Assert.True(file.FileContents.Length > 0);
     }
 
     // ---- Add -----------------------------------------------------------

@@ -7,12 +7,27 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="CMS.API.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.16" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.16" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.3.1" />
+    <!-- Course-flyer PDF: server-side layout (QuestPDF) + server-side QR (QRCoder). -->
+    <PackageReference Include="QuestPDF" Version="2026.7.1" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+  </ItemGroup>
+
+  <!-- Noto Sans TC (SIL OFL) — embedded so CJK glyphs travel with the binary and render on
+       machines without the font installed. Regular + Bold static weights (not a variable font,
+       which QuestPDF can't select a Bold instance from). Loaded at startup in Program.cs. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\Fonts\NotoSansTC-Regular.ttf" />
+    <EmbeddedResource Include="Assets\Fonts\NotoSansTC-Bold.ttf" />
   </ItemGroup>
 
 </Project>

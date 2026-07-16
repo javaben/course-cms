@@ -1,5 +1,6 @@
 using CMS.API.Models;
 using CMS.API.Repositories;
+using CMS.API.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CMS.API.Controllers;
@@ -9,10 +10,17 @@ namespace CMS.API.Controllers;
 public class CoursesController : ControllerBase
 {
     private readonly ICourseRepository _repository;
+    private readonly ILookupRepository _lookups;
+    private readonly ICoursePdfService _pdfService;
 
-    public CoursesController(ICourseRepository repository)
+    public CoursesController(
+        ICourseRepository repository,
+        ILookupRepository lookups,
+        ICoursePdfService pdfService)
     {
         _repository = repository;
+        _lookups = lookups;
+        _pdfService = pdfService;
     }
 
     /// <summary>All courses (課程), FK labels included, ordered by DisplayOrder.</summary>
@@ -31,6 +39,35 @@ public class CoursesController : ControllerBase
     {
         var course = await _repository.GetByIdAsync(id, ct);
         return course is null ? NotFound() : Ok(course);
+    }
+
+    /// <summary>
+    /// Course flyer as a downloadable PDF (課程宣傳單). Reuses the same GetById data path (no new
+    /// course SQL) and resolves certification names via the lookup repo, then hands both to the
+    /// PDF service. Inherits the app-wide JWT policy — do NOT add [AllowAnonymous].
+    /// </summary>
+    [HttpGet("{id:int}/pdf")]
+    public async Task<IActionResult> GetPdf(int id, CancellationToken ct)
+    {
+        var course = await _repository.GetByIdAsync(id, ct);
+        if (course is null) return NotFound();
+
+        var certLabels = await ResolveCertLabelsAsync(course, ct);
+        var pdf = _pdfService.Build(course, certLabels);
+        return File(pdf, "application/pdf", $"course-{id}.pdf");
+    }
+
+    /// <summary>Map the course's certification pkids to their display labels, preserving order.</summary>
+    private async Task<IReadOnlyList<string>> ResolveCertLabelsAsync(Course course, CancellationToken ct)
+    {
+        if (course.CertificationPkids.Count == 0) return [];
+
+        var all = await _lookups.GetCertificationsAsync(ct);
+        var byPkid = all.ToDictionary(c => c.Pkid, c => c.Label);
+        return course.CertificationPkids
+            .Where(byPkid.ContainsKey)
+            .Select(pkid => byPkid[pkid])
+            .ToList();
     }
 
     /// <summary>Create a course. pkid is auto-generated (IDENTITY); both junctions synced in a txn.</summary>

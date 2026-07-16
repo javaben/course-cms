@@ -100,4 +100,65 @@ describe('CourseDetail', () => {
     const qrTitle: HTMLElement = fixture.nativeElement.querySelector('app-course-qr-code .qr-title');
     expect(qrTitle.textContent?.trim()).toBe('AZ-900');
   });
+
+  // ---- Download PDF --------------------------------------------------------
+
+  it('downloads the flyer blob and toasts success', async () => {
+    flushLoad();
+    const toast = spyOn(TestBed.inject(MessageService), 'add');
+    spyOn(URL, 'createObjectURL').and.returnValue('blob:fake');
+    const revoke = spyOn(URL, 'revokeObjectURL');
+    spyOn(HTMLAnchorElement.prototype, 'click'); // don't trigger a real navigation
+
+    const done = component.downloadPdf();
+    const req = http.expectOne(`${base}/api/courses/1/pdf`);
+    expect(req.request.responseType).toBe('blob');
+    req.flush(new Blob(['%PDF-1.7'], { type: 'application/pdf' }));
+    await done;
+
+    expect(toast).toHaveBeenCalledWith(jasmine.objectContaining({ severity: 'success' }));
+    expect(revoke).toHaveBeenCalledWith('blob:fake');
+    expect(component.pdfLoading()).toBeFalse();
+  });
+
+  it('decodes the blob error body instead of showing "[object Blob]" (B3)', async () => {
+    flushLoad();
+    const toast = spyOn(TestBed.inject(MessageService), 'add');
+
+    const done = component.downloadPdf();
+    http.expectOne(`${base}/api/courses/1/pdf`).flush(new Blob(['伺服器產生失敗']), {
+      status: 500,
+      statusText: 'Server Error',
+    });
+    await done;
+
+    const arg = toast.calls.mostRecent().args[0];
+    expect(arg.severity).toBe('error');
+    expect(arg.detail).toBe('伺服器產生失敗');
+    expect(arg.detail).not.toContain('[object Blob]');
+    expect(component.pdfLoading()).toBeFalse();
+  });
+
+  it('maps a 404 to a not-found message', async () => {
+    flushLoad();
+    const toast = spyOn(TestBed.inject(MessageService), 'add');
+
+    const done = component.downloadPdf();
+    http.expectOne(`${base}/api/courses/1/pdf`).flush(new Blob(['']), {
+      status: 404,
+      statusText: 'Not Found',
+    });
+    await done;
+
+    expect(toast.calls.mostRecent().args[0].detail).toContain('找不到');
+  });
+
+  it('ignores a second trigger while a download is in flight (no double-submit)', async () => {
+    flushLoad();
+    component.pdfLoading.set(true); // simulate an in-flight download
+
+    await component.downloadPdf();
+
+    http.expectNone(`${base}/api/courses/1/pdf`);
+  });
 });

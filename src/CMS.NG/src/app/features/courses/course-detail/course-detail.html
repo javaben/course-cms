@@ -4,6 +4,18 @@
     <h1 class="title">檢視課程</h1>
     <div class="actions">
       <button type="button" pButton class="p-button-outlined" icon="pi pi-arrow-left" label="返回" (click)="back()"></button>
+      <button
+        type="button"
+        pButton
+        class="p-button-help"
+        icon="pi pi-file-pdf"
+        [label]="pdfLoading() ? '產生中… Generating…' : '下載 PDF'"
+        [loading]="pdfLoading()"
+        [disabled]="pdfLoading() || !course()"
+        pTooltip="產生課程宣傳單 PDF Download flyer"
+        tooltipPosition="bottom"
+        (click)="downloadPdf()"
+      ></button>
       <button type="button" pButton class="p-button-success" icon="pi pi-pencil" label="編輯" (click)="edit()"></button>
     </div>
   </div>

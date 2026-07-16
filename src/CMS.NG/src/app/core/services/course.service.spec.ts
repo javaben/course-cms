@@ -94,4 +94,12 @@ describe('CourseService', () => {
     expect(req.request.method).toBe('DELETE');
     req.flush(null);
   });
+
+  it('downloadPdf GETs the pdf route as a blob (so the bearer token attaches)', () => {
+    service.downloadPdf(5).subscribe();
+    const req = http.expectOne(`${base}/5/pdf`);
+    expect(req.request.method).toBe('GET');
+    expect(req.request.responseType).toBe('blob');
+    req.flush(new Blob(['%PDF-1.7'], { type: 'application/pdf' }));
+  });
 });

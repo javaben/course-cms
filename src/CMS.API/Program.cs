@@ -1,6 +1,7 @@
 using CMS.API.Controllers;
 using CMS.API.Infrastructure;
 using CMS.API.Repositories;
+using CMS.API.Services;
 using Dapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -50,6 +51,13 @@ builder.Services.AddScoped<ICourseGroupRepository, CourseGroupRepository>();
 builder.Services.AddScoped<ICourseRepository, CourseRepository>();
 builder.Services.AddScoped<IFeaturedPromoItemRepository, FeaturedPromoItemRepository>();
 builder.Services.AddScoped<ILookupRepository, LookupRepository>();
+
+// Course-flyer PDF. Sets the QuestPDF Community license + registers the embedded Noto Sans TC
+// faces (via the service's static ctor) at startup, so a bad font/license fails at boot, not on
+// the first download. The QR base URL is read from config (shared with the on-page QR).
+CoursePdfService.EnsureConfigured();
+builder.Services.AddSingleton<ICoursePdfService>(
+    new CoursePdfService(builder.Configuration["PublicSite:BaseUrl"] ?? "https://www.uuu.com.tw"));
 
 // --- Authentication / Authorization -------------------------------------
 // JWT bearer, validated with the SAME SysConfig['appConfig'].symmetricSecurityKey used to issue

@@ -46,6 +46,21 @@ public class AuthorizationTests : IDisposable
                 services.RemoveAll<IAppRoleRepository>();
                 services.AddSingleton<IAppRoleRepository>(new InMemoryAppRoleRepository().Seed(
                     new AppRole { RoleId = "Admin", RoleName = "Administrator", PermissionLevel = 1 }));
+
+                // Course + lookup repos back the PDF endpoint's data path (no DB in tests).
+                services.RemoveAll<ICourseRepository>();
+                services.AddSingleton<ICourseRepository>(new InMemoryCourseRepository()
+                    .WithPartners((1, "微軟"))
+                    .Seed(new Course
+                    {
+                        Pkid = 1, Title = "Azure 基礎", CourseId = "AZ-900", PartnerPkid = 1,
+                        PublishStatusPkid = 1, Hour = 40, ListPrice = 12000m, LearningCredit = 3.5m,
+                        Objective = "了解雲端運算的核心概念。", CertificationPkids = [10],
+                    }));
+
+                services.RemoveAll<ILookupRepository>();
+                services.AddSingleton<ILookupRepository>(new InMemoryLookupRepository()
+                    .SeedCertifications(new CertificationLookup { Pkid = 10, Label = "微軟 - AZ-900" }));
             });
         }
     }
@@ -106,6 +121,43 @@ public class AuthorizationTests : IDisposable
         var res = await client.SendAsync(req);
 
         Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+    }
+
+    // ---- Course PDF endpoint honors the global policy ----------------------
+
+    [Fact]
+    public async Task Course_pdf_without_token_returns_401()
+    {
+        var client = _factory.CreateClient();
+
+        var res = await client.GetAsync("/api/courses/1/pdf");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Course_pdf_with_valid_token_returns_200_application_pdf()
+    {
+        var client = _factory.CreateClient();
+        var token = await LoginAsync(client);
+
+        var res = await SendAsync(client, HttpMethod.Get, "/api/courses/1/pdf", token);
+
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.Equal("application/pdf", res.Content.Headers.ContentType?.MediaType);
+        var bytes = await res.Content.ReadAsByteArrayAsync();
+        Assert.StartsWith("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
+    }
+
+    [Fact]
+    public async Task Course_pdf_for_unknown_id_returns_404()
+    {
+        var client = _factory.CreateClient();
+        var token = await LoginAsync(client);
+
+        var res = await SendAsync(client, HttpMethod.Get, "/api/courses/999/pdf", token);
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
     }
 
     // ---- AuthController stays anonymous ------------------------------------

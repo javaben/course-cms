@@ -1,12 +1,14 @@
 import { Component, Input, OnChanges, signal } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
 import * as QRCode from 'qrcode';
+import { environment } from '@env/environment';
 
 /**
  * Renders a downloadable QR code for a course's public page.
- * The encoded URL is <c>https://www.uuu.com.tw/Course/Show/{pkid}/{courseId}</c> and the
- * CourseId is shown as the caption/title. The image is generated as a PNG data URL, so the
- * download needs no server round-trip.
+ * The encoded URL is <c>{publicSiteBaseUrl}/Course/Show/{pkid}/{courseId}</c> and the CourseId is
+ * shown as the caption/title. The base comes from the environment (shared with the server flyer's
+ * QR via the API's PublicSite:BaseUrl) so the on-screen and printed codes can't drift. The image is
+ * generated as a PNG data URL, so the download needs no server round-trip.
  */
 @Component({
   selector: 'app-course-qr-code',
@@ -24,7 +26,7 @@ export class CourseQrCode implements OnChanges {
 
   /** The public course URL the QR encodes. */
   get url(): string {
-    return `https://www.uuu.com.tw/Course/Show/${this.pkid}/${this.courseId}`;
+    return `${environment.publicSiteBaseUrl}/Course/Show/${this.pkid}/${this.courseId}`;
   }
 
   ngOnChanges(): void {

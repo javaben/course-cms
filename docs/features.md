@@ -153,6 +153,43 @@ inline cell-editing on the list.
   renders the QR as a **PNG data URL** via the `qrcode` package (`QRCode.toDataURL`) — so the
   download (`{courseId}.png`, via a synthesized `<a download>`) needs no server round-trip.
 - `qrcode` is CommonJS → allow-listed in `angular.json` `allowedCommonJsDependencies`.
+- The base URL comes from `environment.publicSiteBaseUrl` (not a hardcoded literal) so the on-screen
+  QR and the server flyer's QR share one source — see the PDF flyer below.
+
+### PDF flyer download (課程宣傳單) — `GET /api/courses/{id:int}/pdf`
+
+A server-rendered, bilingual (繁體中文 + English) one/two-page flyer, downloadable from the detail page.
+
+- **Endpoint**: thin action on `CoursesController` — `GetByIdAsync` → `404` if null → resolve cert
+  labels (`ILookupRepository.GetCertificationsAsync`, filtered by the course's `CertificationPkids`)
+  → `File(bytes, "application/pdf", "course-{id}.pdf")`. No new course SQL; reuses the detail data
+  path. Inherits the global JWT policy — **no `[Authorize]`, no `[AllowAnonymous]`**.
+- **`ICoursePdfService` / `CoursePdfService`** (`src/CMS.API/Services/`): pure layout → `byte[]`, so
+  it is unit-testable without HTTP. Built with **QuestPDF** (fluent API; `LicenseType.Community` — a
+  personal/learning build, see the feature plan). Layout: kicker/title/subtitle type scale, a labeled
+  bilingual meta row with units (`學費 NT$12,000` · `時數 40 小時` · `學分 3.5`; `0`/null price →
+  `免費 Free`, never `NT$0`), fixed section order Objective → Target → Outline → Certifications with
+  **empty sections hidden**, and long Outline paginating cleanly to page 2.
+- **CJK font**: Noto Sans TC (SIL OFL) **Regular + Bold static** faces are embedded via
+  `<EmbeddedResource>` (`Assets/Fonts/`, ~5.8 MB each) and registered with QuestPDF's `FontManager`
+  in the service's static ctor (also sets the license) — so glyphs render on machines without the
+  font installed. **A variable font won't work** (QuestPDF can't select a Bold instance from a VF).
+- **Server QR** (`QRCoder` `PngByteQRCode` — avoids the Windows-only `System.Drawing.Common`): encodes
+  the exact same string as the on-page QR, `{PublicSite:BaseUrl}/Course/Show/{pkid}/{courseId}`
+  (base in `appsettings.json`). Rendered as a fail-safe block: QR image + caption + the URL printed
+  as readable text, so the sheet still works if a scan fails.
+- **Frontend**: `CourseService.downloadPdf` uses `HttpClient` with `responseType:'blob'` so the auth
+  interceptor attaches the bearer (a plain `<a href>` would 401). The detail-page button shows a
+  loading state (disabled + label swap, blocks double-submit), a success toast, and on failure
+  **decodes the blob error body** (`await err.error.text()`, else it renders as `[object Blob]`) with
+  a status-branched message (401/404/500) and a ~15 s client timeout.
+- **Deploy**: Windows/IIS — SkiaSharp (QuestPDF's renderer) works out of the box. A Linux/container
+  move would need `SkiaSharp.NativeAssets.Linux` + `libfontconfig1` and a re-run of the font check.
+- **Tests**: `CoursePdfServiceTests` (valid `%PDF`, **font embedded** via `NotoSansTC` in the bytes,
+  null/all-empty no-throw, long-Outline multi-page via `/MediaBox` count, price formatting, QR URL
+  shape); controller tests (`application/pdf` File + `404`); E2E `AuthorizationTests` (`401`/`200`).
+  One thing tests **cannot** prove — that glyphs render, not □□□ — is a mandatory manual gate before
+  merge: open a generated PDF on a machine with Noto Sans TC uninstalled.
 
 ### Inline cell-editing on the list (課程 list)
 

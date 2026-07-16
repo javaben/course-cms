@@ -32,4 +32,13 @@ export class CourseService {
   delete(pkid: number): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/${pkid}`);
   }
+
+  /**
+   * Download the course flyer as a PDF. Goes through HttpClient (not a plain link) so the
+   * auth interceptor attaches the bearer token — a bare `<a href>` would send no header and 401.
+   * `responseType: 'blob'` keeps the binary intact; the caller saves it via an object URL.
+   */
+  downloadPdf(pkid: number): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/${pkid}/pdf`, { responseType: 'blob' });
+  }
 }
