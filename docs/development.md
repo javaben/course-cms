@@ -23,8 +23,15 @@ npm test -- --include src/app/features/app-roles/app-role-form/app-role-form.spe
 ## Run order for local dev
 
 1. Create the `CMS` database on `.\SQLEXPRESS` and run `database/*.sql` (start with `auth.sql`).
-2. `dotnet run --project CMS.API` (port 5000).
-3. `npm start` in `CMS.NG` (port 4200).
+2. **Seed `SysConfig['appConfig']` and a first user.** The SQL files are schema-only — they insert no
+   rows — and every endpoint but `POST /api/Auth/login` requires a token, so the first account can't
+   be created through the API. Without this step the app builds, starts, and then fails login with a
+   generic 500. See [tutorial-getting-started.md](tutorial-getting-started.md) → Step 3.
+3. `dotnet run --project CMS.API` (port 5000).
+4. `npm start` in `CMS.NG` (port 4200).
+
+Setting up from scratch? Follow [tutorial-getting-started.md](tutorial-getting-started.md) instead —
+it's the same path with the bootstrap SQL written out and a troubleshooting section.
 
 ## Live database
 

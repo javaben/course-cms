@@ -21,6 +21,7 @@ Wired through shared services — read **`docs/conventions.md`** before adding a
 | `docs/architecture.md` | 3-layer backend, the 3 PK shapes, n-n, routes, frontend layout |
 | `docs/features.md` | implemented features + per-feature conventions |
 | `docs/development.md` | commands, run order, live `localhost:5000` DB (read-only) |
+| `docs/tutorial-getting-started.md` | fresh-clone setup: schema → bootstrap `appConfig` + first user → signed in |
 | `docs/learnings.md` | non-obvious traps this codebase has already sprung (legacy HTML in Course free-text, auth-attribute gotchas, blob downloads) |
 | `spec/auth.md` | auth: login/JWT, global authorization, profile, change/reset password |
 
