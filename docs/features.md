@@ -176,6 +176,13 @@ A server-rendered, bilingual (繁體中文 + English) one/two-page flyer, downlo
   bilingual meta row with units (`學費 NT$12,000` · `時數 40 小時` · `學分 3.5`; `0`/null price →
   `免費 Free`, never `NT$0`), fixed section order Objective → Target → Outline → Certifications with
   **empty sections hidden**, and long Outline paginating cleanly to page 2.
+- **Stored HTML is flattened first** (`ToPlainText`): the curated free-text columns are legacy
+  `nvarchar(max)` holding markup — the detail page renders it, but QuestPDF draws a string verbatim,
+  so raw `<br>` / `<span style=…>` (and, in ~10 rows, a whole pasted `<!DOCTYPE html>` document with
+  its CSS) would print on the sheet. `script`/`style`/`head` are dropped whole so their content can't
+  leak, block tags become newlines to keep line structure, remaining tags are stripped, and entities
+  decode **last** (so an encoded `&lt;b&gt;` can't re-enter as a live tag). A body that flattens to
+  nothing hides its section instead of printing a bare heading. ~18% of courses carry such markup.
 - **CJK font**: Noto Sans TC (SIL OFL) **Regular + Bold static** faces are embedded via
   `<EmbeddedResource>` (`Assets/Fonts/`, ~5.8 MB each) and registered with QuestPDF's `FontManager`
   in the service's static ctor (also sets the license) — so glyphs render on machines without the
@@ -193,7 +200,8 @@ A server-rendered, bilingual (繁體中文 + English) one/two-page flyer, downlo
   move would need `SkiaSharp.NativeAssets.Linux` + `libfontconfig1` and a re-run of the font check.
 - **Tests**: `CoursePdfServiceTests` (valid `%PDF`, **font embedded** via `NotoSansTC` in the bytes,
   null/all-empty no-throw, long-Outline multi-page via `/MediaBox` count, price formatting, QR URL
-  shape); controller tests (`application/pdf` File + `404`); E2E `AuthorizationTests` (`401`/`200`).
+  shape, `ToPlainText` markup flattening); controller tests (`application/pdf` File + `404`); E2E
+  `AuthorizationTests` (`401`/`200`).
   One thing tests **cannot** prove — that glyphs render, not □□□ — is a mandatory manual gate before
   merge: open a generated PDF on a machine with Noto Sans TC uninstalled.
 
