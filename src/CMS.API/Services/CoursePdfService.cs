@@ -1,4 +1,6 @@
+using System.Net;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using CMS.API.Models;
 using QRCoder;
 using QuestPDF.Drawing;
@@ -146,11 +148,16 @@ public sealed class CoursePdfService : ICoursePdfService
     {
         if (string.IsNullOrWhiteSpace(body)) return;
 
+        var text = ToPlainText(body);
+        // Markup-only content (e.g. a stray "<br>") flattens to nothing — hide the section rather
+        // than print a bare heading.
+        if (text.Length == 0) return;
+
         col.Item().Column(sec =>
         {
             sec.Spacing(4);
             sec.Item().Text(heading).FontSize(13).Bold();
-            sec.Item().Text(body.Trim());
+            sec.Item().Text(text);
         });
     }
 
@@ -172,6 +179,55 @@ public sealed class CoursePdfService : ICoursePdfService
     }
 
     // ---- helpers -------------------------------------------------------------
+
+    // Elements whose *content* is markup plumbing, not prose — dropped whole, not just untagged.
+    private static readonly Regex NonProseElements = new(
+        @"<(script|style|head)\b[^>]*>.*?</\1\s*>",
+        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+
+    // Comments and declarations, e.g. <!-- ... --> and <!DOCTYPE html>.
+    private static readonly Regex CommentsAndDeclarations = new(
+        @"<!--.*?-->|<![^>]*>",
+        RegexOptions.Singleline | RegexOptions.Compiled);
+
+    // Block-level boundaries — become newlines so the author's line structure survives.
+    private static readonly Regex BlockBoundaries = new(
+        @"</?(br|p|div|li|tr|ul|ol|table|h[1-6]|blockquote|section)\b[^>]*>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Any remaining tag. The letter right after "<" is required, so prose like "a < b" or "<5"
+    // is left alone — only real tags match.
+    private static readonly Regex AnyTag = new(
+        @"</?[a-zA-Z][^>]*>",
+        RegexOptions.Compiled);
+
+    private static readonly Regex BlankLineRuns = new(@"\n{3,}", RegexOptions.Compiled);
+    private static readonly Regex TrailingSpaces = new(@"[ \t]+(?=\n)|(?<=\n)[ \t]+", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Flattens stored rich text to plain text for the sheet.
+    ///
+    /// The curated free-text columns are legacy <c>nvarchar(max)</c> that hold HTML — the web detail
+    /// page renders it as markup, but QuestPDF draws a string verbatim, so unflattened content
+    /// printed raw tags ("&lt;br&gt;", "&lt;span style=...&gt;") on the flyer; a few rows hold an
+    /// entire pasted HTML document, which printed its CSS too.
+    /// </summary>
+    internal static string ToPlainText(string html)
+    {
+        var text = NonProseElements.Replace(html, "\n");
+        text = CommentsAndDeclarations.Replace(text, string.Empty);
+        text = BlockBoundaries.Replace(text, "\n");
+        text = AnyTag.Replace(text, string.Empty);
+
+        // Decode only after tags are gone, so an encoded "&lt;b&gt;" can't re-enter as a live tag.
+        text = WebUtility.HtmlDecode(text);
+
+        // &nbsp; decodes to U+00A0; normalise it to a plain space so the text wraps normally.
+        text = text.Replace("\r\n", "\n").Replace('\r', '\n').Replace('\u00A0', ' ');
+        text = TrailingSpaces.Replace(text, string.Empty);
+        text = BlankLineRuns.Replace(text, "\n\n");
+        return text.Trim();
+    }
 
     /// <summary>NT$-prefixed thousands, no trailing-zero noise; 0/negative → free (never "NT$0").</summary>
     internal static string FormatPrice(decimal listPrice)

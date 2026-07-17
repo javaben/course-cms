@@ -122,6 +122,73 @@ public class CoursePdfServiceTests
     public void FormatPrice_is_explicit(decimal input, string expected)
         => Assert.Equal(expected, CoursePdfService.FormatPrice(input));
 
+    // ---- Legacy HTML in the curated free-text fields ------------------------
+    // Regression: ISSUE-001 — stored rich text printed its raw markup on the flyer
+    // ("<br>", "<span style=...>", and for a few rows an entire pasted HTML document incl. CSS).
+    // Found by /qa on 2026-07-17 (course 66 and course 2158 on localhost).
+    // Report: .gstack/qa-reports/qa-report-localhost-4200-2026-07-17.md
+
+    [Theory]
+    [InlineData("一<br>二", "一\n二")]
+    [InlineData("<p>段落</p>", "段落")]
+    [InlineData("<span style=\"color:#ff0000; font-weight:600;\">紅字</span>", "紅字")]
+    [InlineData("<!DOCTYPE html><html><body>內容</body></html>", "內容")]
+    [InlineData("A&nbsp;B", "A B")]
+    [InlineData("R&amp;D &lt;tag&gt;", "R&D <tag>")]      // decode happens after tags are stripped
+    [InlineData("<!-- 註解 -->可見", "可見")]
+    [InlineData("純文字，沒有標記", "純文字，沒有標記")] // untouched when there is no markup
+    [InlineData("2 < 5 且 x > 1", "2 < 5 且 x > 1")]     // bare comparisons are not tags
+    public void ToPlainText_flattens_stored_markup(string input, string expected)
+        => Assert.Equal(expected, CoursePdfService.ToPlainText(input));
+
+    [Fact]
+    public void ToPlainText_drops_style_and_script_content_entirely()
+    {
+        // A real row (course 2158) held a whole pasted document — its CSS must not reach the sheet.
+        const string html = """
+            <!DOCTYPE html>
+            <html lang="zh-Hant">
+            <head><style>body { font-family: Arial; font-size: 14px; }</style></head>
+            <body><p>第一章 課程簡介</p></body>
+            </html>
+            """;
+
+        var text = CoursePdfService.ToPlainText(html);
+
+        Assert.Equal("第一章 課程簡介", text);
+        Assert.DoesNotContain("font-family", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Arial", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Build_does_not_print_raw_markup_for_html_bearing_fields()
+    {
+        var course = CjkCourse();
+        course.Objective = "<p><span style=\"color:#ff0000\">※贈送認證考試一次</span></p>";
+        course.Outline = "<!DOCTYPE html><html><head><style>p{color:red}</style></head>"
+                       + "<body>第一章 雲端概念<br>第二章 核心服務</body></html>";
+
+        var bytes = Service().Build(course, CertLabels);
+
+        Assert.StartsWith("%PDF", Encoding.ASCII.GetString(bytes, 0, 4));
+        // The flattened text is what reaches the layout; the tags never become drawable content.
+        Assert.Equal("※贈送認證考試一次", CoursePdfService.ToPlainText(course.Objective));
+        Assert.Equal("第一章 雲端概念\n第二章 核心服務", CoursePdfService.ToPlainText(course.Outline));
+    }
+
+    [Fact]
+    public void Build_hides_a_section_whose_body_is_markup_only()
+    {
+        // "<br>" alone flattens to nothing — the heading must not print on its own.
+        var course = CjkCourse();
+        course.Target = "<br>";
+
+        var bytes = Service().Build(course, CertLabels);
+
+        Assert.StartsWith("%PDF", Encoding.ASCII.GetString(bytes, 0, 4));
+        Assert.Equal(string.Empty, CoursePdfService.ToPlainText(course.Target));
+    }
+
     // ---- QR URL matches the on-page QR shape --------------------------------
 
     [Fact]
