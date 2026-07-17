@@ -22,9 +22,9 @@ public sealed class CourseRepository : ICourseRepository
         _audit = audit;
     }
 
-    // Course scalar columns + the three FK nav objects (each nav's leading column AS Pkid → splitOn).
-    private const string SelectColumns = @"
-        SELECT c.pkid                AS Pkid,
+    // Fixed-width scalars — every column the list renders, exports or filters on.
+    private const string ScalarColumns = @"
+               c.pkid                AS Pkid,
                c.Title               AS Title,
                c.OfficialTitle       AS OfficialTitle,
                c.CourseId            AS CourseId,
@@ -39,6 +39,11 @@ public sealed class CourseRepository : ICourseRepository
                c.Hour                AS Hour,
                c.ListPrice           AS ListPrice,
                c.LearningCredit      AS LearningCredit,
+               c.CanRepeat           AS CanRepeat";
+
+    // The nvarchar(max) free-text columns. The detail page, the PDF flyer and the audit snapshot all
+    // need them; the list renders none of them, where they cost ~2 MB per load across 1084 rows.
+    private const string FreeTextColumns = @"
                c.Material            AS Material,
                c.Objective           AS Objective,
                c.Target              AS Target,
@@ -46,8 +51,11 @@ public sealed class CourseRepository : ICourseRepository
                c.Outline             AS Outline,
                c.TowardCertOrExam    AS TowardCertOrExam,
                c.Note                AS Note,
-               c.OtherInfo           AS OtherInfo,
-               c.CanRepeat           AS CanRepeat,
+               c.OtherInfo           AS OtherInfo";
+
+    // The three FK nav objects (each nav's leading column AS Pkid → splitOn) + the joins. Must stay
+    // last: splitOn slices the row at each Pkid, so every course column has to precede p.pkid.
+    private const string NavColumnsAndFrom = @"
                p.pkid  AS Pkid, p.Name        AS Name,          -- Partner nav
                g.pkid  AS Pkid, g.Description  AS Description,   -- CourseGroup nav
                s.pkid  AS Pkid, s.Description  AS Description    -- PublishStatus nav
@@ -55,6 +63,14 @@ public sealed class CourseRepository : ICourseRepository
         LEFT JOIN Partner       p ON p.pkid = c.Partner_pkid
         LEFT JOIN CourseGroup   g ON g.pkid = c.CourseGroup_pkid
         LEFT JOIN PublishStatus s ON s.pkid = c.PublishStatus_pkid";
+
+    // Every column — for single-row loads (detail, PDF flyer, audit before/after snapshot).
+    private const string SelectColumns =
+        "SELECT" + ScalarColumns + "," + FreeTextColumns + "," + NavColumnsAndFrom;
+
+    // List/search projection: same rows, minus the free-text blobs nothing on the list reads.
+    private const string ListSelectColumns =
+        "SELECT" + ScalarColumns + "," + NavColumnsAndFrom;
 
     private static async Task<List<Course>> QueryCoursesAsync(
         IDbConnection conn, string sql, object? param, CancellationToken ct, IDbTransaction? tx = null)
@@ -75,7 +91,7 @@ public sealed class CourseRepository : ICourseRepository
     public async Task<IReadOnlyList<Course>> GetAllAsync(CancellationToken ct = default)
     {
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
-        var sql = $"{SelectColumns} ORDER BY c.DisplayOrder ASC, c.pkid ASC";
+        var sql = $"{ListSelectColumns} ORDER BY c.DisplayOrder ASC, c.pkid ASC";
         return await QueryCoursesAsync(conn, sql, null, ct);
     }
 
@@ -135,7 +151,7 @@ public sealed class CourseRepository : ICourseRepository
         }
 
         var whereClause = where.Count > 0 ? $" WHERE {string.Join(" AND ", where)}" : "";
-        var sql = $"{SelectColumns}{whereClause} ORDER BY c.DisplayOrder ASC, c.pkid ASC";
+        var sql = $"{ListSelectColumns}{whereClause} ORDER BY c.DisplayOrder ASC, c.pkid ASC";
 
         using var conn = await _factory.CreateOpenConnectionAsync(ct);
         return await QueryCoursesAsync(conn, sql, p, ct);
