@@ -205,7 +205,8 @@ public sealed class AppUserRepository : IAppUserRepository
     }
 
     /// <summary>
-    /// Reads SysConfig['appConfig'].defaultPassword and returns its SHA-256 hash as lowercase hex.
+    /// Reads SysConfig['appConfig'].defaultPassword and returns a freshly salted hash of it. Each call
+    /// produces a distinct hash, so users sharing the default password do not share a stored value.
     /// Throws if the config row or the defaultPassword property is missing (misconfiguration → 500).
     /// </summary>
     private static async Task<string> GetDefaultPasswordHashAsync(
@@ -234,6 +235,6 @@ public sealed class AppUserRepository : IAppUserRepository
         if (string.IsNullOrEmpty(defaultPassword))
             throw new InvalidOperationException("appConfig.defaultPassword 未設定。");
 
-        return PasswordHasher.Sha256Hex(defaultPassword);
+        return PasswordHasher.Hash(defaultPassword);
     }
 }

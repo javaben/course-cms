@@ -66,11 +66,24 @@ public sealed class AuthRepository : IAuthRepository
         var json = await conn.ExecuteScalarAsync<string?>(new CommandDefinition(
             "SELECT configValue FROM SysConfig WHERE configKey = 'appConfig'", cancellationToken: ct));
         var defaultPassword = AppConfig.GetRequiredProperty(json, "defaultPassword");
-        var hash = PasswordHasher.Sha256Hex(defaultPassword);
+        var hash = PasswordHasher.Hash(defaultPassword);
 
         var affected = await conn.ExecuteAsync(new CommandDefinition(
             "UPDATE AppUser SET PasswordHash = @Hash, PasswordUpdatedTime = @Now WHERE UserId = @UserId",
             new { UserId = userId, Hash = hash, Now = DateTime.UtcNow }, cancellationToken: ct));
+
+        return affected > 0;
+    }
+
+    public async Task<bool> UpgradePasswordHashAsync(
+        string userId, string newPasswordHash, CancellationToken ct = default)
+    {
+        using var conn = await _factory.CreateOpenConnectionAsync(ct);
+
+        // PasswordUpdatedTime deliberately untouched — the password did not change, only its encoding.
+        var affected = await conn.ExecuteAsync(new CommandDefinition(
+            "UPDATE AppUser SET PasswordHash = @Hash WHERE UserId = @UserId",
+            new { UserId = userId, Hash = newPasswordHash }, cancellationToken: ct));
 
         return affected > 0;
     }

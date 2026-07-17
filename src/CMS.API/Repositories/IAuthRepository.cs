@@ -25,8 +25,16 @@ public interface IAuthRepository
 
     /// <summary>
     /// Resets the user's password to the <c>defaultPassword</c> from <c>SysConfig['appConfig']</c>
-    /// (read at runtime): sets <c>PasswordHash = SHA256(default)</c> and bumps
+    /// (read at runtime): sets <c>PasswordHash</c> to a fresh hash of that default and bumps
     /// <c>PasswordUpdatedTime</c>. Returns <c>false</c> if no such user exists.
     /// </summary>
     Task<bool> ResetPasswordToDefaultAsync(string userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Rewrites <c>PasswordHash</c> in place after a successful login re-hashed a legacy/weaker hash
+    /// (see <see cref="Infrastructure.PasswordVerificationResult.SuccessRehashNeeded"/>). The password
+    /// itself is unchanged, so <c>PasswordUpdatedTime</c> is deliberately <b>not</b> bumped — this is a
+    /// storage-format upgrade, not a password change, and the timestamp means the latter.
+    /// </summary>
+    Task<bool> UpgradePasswordHashAsync(string userId, string newPasswordHash, CancellationToken ct = default);
 }

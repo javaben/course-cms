@@ -6,9 +6,8 @@ namespace CMS.API.Tests.Fakes;
 
 /// <summary>
 /// In-memory <see cref="IAuthRepository"/> for AuthController tests. Seeded users carry a plaintext
-/// password that is SHA-256 hashed the same way the real repo stores it, so the controller's hash
-/// comparison exercises the genuine code path. The signing key is supplied separately via
-/// <see cref="FakeSigningKeyProvider"/>.
+/// password hashed exactly as the real repo stores it, so the controller's verification exercises the
+/// genuine code path. The signing key is supplied separately via <see cref="FakeSigningKeyProvider"/>.
 /// </summary>
 public sealed class InMemoryAuthRepository : IAuthRepository
 {
@@ -17,15 +16,26 @@ public sealed class InMemoryAuthRepository : IAuthRepository
 
     private readonly List<AuthUser> _users = [];
 
+    /// <summary>Tracks UpgradePasswordHashAsync calls so tests can assert on rehash-on-login.</summary>
+    public List<string> UpgradedUserIds { get; } = [];
+
     /// <summary>Seeds a user, hashing <paramref name="password"/> exactly as the real repo would.</summary>
     public InMemoryAuthRepository Seed(string userId, string userName, string password, bool isActive, params string[] roleIds)
+        => SeedWithHash(userId, userName, PasswordHasher.Hash(password), isActive, roleIds);
+
+    /// <summary>
+    /// Seeds a user with a pre-built <paramref name="passwordHash"/> — lets a test plant a legacy
+    /// SHA-256 row and prove the login path still accepts and upgrades it.
+    /// </summary>
+    public InMemoryAuthRepository SeedWithHash(
+        string userId, string userName, string passwordHash, bool isActive, params string[] roleIds)
     {
         _users.Add(new AuthUser
         {
             UserId = userId,
             UserName = userName,
             IsActive = isActive,
-            PasswordHash = PasswordHasher.Sha256Hex(password),
+            PasswordHash = passwordHash,
             RoleIds = roleIds.ToList(),
         });
         return this;
@@ -56,8 +66,17 @@ public sealed class InMemoryAuthRepository : IAuthRepository
     {
         var user = Find(userId);
         if (user is null) return Task.FromResult(false);
-        user.PasswordHash = PasswordHasher.Sha256Hex(DefaultPassword);
+        user.PasswordHash = PasswordHasher.Hash(DefaultPassword);
         user.PasswordUpdatedTime = DateTime.UtcNow;
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> UpgradePasswordHashAsync(string userId, string newPasswordHash, CancellationToken ct = default)
+    {
+        var user = Find(userId);
+        if (user is null) return Task.FromResult(false);
+        user.PasswordHash = newPasswordHash; // PasswordUpdatedTime deliberately untouched
+        UpgradedUserIds.Add(userId);
         return Task.FromResult(true);
     }
 

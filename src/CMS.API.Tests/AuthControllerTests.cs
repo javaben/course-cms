@@ -111,8 +111,8 @@ public class AuthControllerTests
 
         Assert.DoesNotContain("passwordHash", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("PasswordHash", json);
-        // The actual hash value must not leak either.
-        Assert.DoesNotContain(CMS.API.Infrastructure.PasswordHasher.Sha256Hex("secret"), json);
+        // The actual stored hash value must not leak either.
+        Assert.DoesNotContain((await repo.FindByUserIdAsync("helen"))!.PasswordHash, json);
     }
 
     // ---- 401 paths (all indistinguishable) -----------------------------
@@ -237,8 +237,103 @@ public class AuthControllerTests
 
         Assert.IsType<NoContentResult>(result);
         var helen = await repo.FindByUserIdAsync("helen");
-        Assert.Equal(PasswordHasher.Sha256Hex("NewPass#1"), helen!.PasswordHash);
+        // Salted, so the hash can only be checked by verifying — not by comparing to an expected value.
+        Assert.Equal(PasswordVerificationResult.Success, PasswordHasher.Verify(helen!.PasswordHash, "NewPass#1"));
+        Assert.Equal(PasswordVerificationResult.Failed, PasswordHasher.Verify(helen.PasswordHash, "secret"));
         Assert.NotNull(helen.PasswordUpdatedTime);
+    }
+
+    [Fact]
+    public async Task ChangePassword_stores_a_salted_hash_never_the_plaintext_or_a_bare_digest()
+    {
+        var repo = SeededRepo();
+        var controller = ControllerAs(repo, "helen");
+
+        await controller.ChangePassword(ChangeReq("secret", "NewPass#1"), CancellationToken.None);
+
+        var stored = (await repo.FindByUserIdAsync("helen"))!.PasswordHash;
+        Assert.StartsWith("pbkdf2-sha256$", stored);
+        Assert.DoesNotContain("NewPass#1", stored);
+        Assert.NotEqual(PasswordHasher.Sha256Hex("NewPass#1"), stored); // never the legacy format
+    }
+
+    [Fact]
+    public async Task Two_users_with_the_same_password_get_different_hashes()
+    {
+        var repo = new InMemoryAuthRepository()
+            .Seed("a", "A", "SamePass#1", isActive: true)
+            .Seed("b", "B", "SamePass#1", isActive: true);
+
+        var a = (await repo.FindByUserIdAsync("a"))!.PasswordHash;
+        var b = (await repo.FindByUserIdAsync("b"))!.PasswordHash;
+
+        // The whole point of per-user salt: identical passwords must not produce identical rows.
+        Assert.NotEqual(a, b);
+        Assert.Equal(PasswordVerificationResult.Success, PasswordHasher.Verify(a, "SamePass#1"));
+        Assert.Equal(PasswordVerificationResult.Success, PasswordHasher.Verify(b, "SamePass#1"));
+    }
+
+    [Fact]
+    public async Task Login_accepts_a_legacy_sha256_row_and_upgrades_it_in_place()
+    {
+        var repo = new InMemoryAuthRepository()
+            .SeedWithHash("legacy", "Legacy User", PasswordHasher.Sha256Hex("secret"), isActive: true);
+        var controller = Controller(repo);
+
+        var result = await controller.Login(
+            new LoginRequest { UserId = "legacy", Password = "secret" }, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+
+        var user = await repo.FindByUserIdAsync("legacy");
+        Assert.Contains("legacy", repo.UpgradedUserIds);
+        Assert.StartsWith("pbkdf2-sha256$", user!.PasswordHash);
+        Assert.Equal(PasswordVerificationResult.Success, PasswordHasher.Verify(user.PasswordHash, "secret"));
+        // A format upgrade is not a password change.
+        Assert.Null(user.PasswordUpdatedTime);
+    }
+
+    [Fact]
+    public async Task Login_rejects_a_wrong_password_against_a_legacy_row_and_does_not_upgrade()
+    {
+        var repo = new InMemoryAuthRepository()
+            .SeedWithHash("legacy", "Legacy User", PasswordHasher.Sha256Hex("secret"), isActive: true);
+        var controller = Controller(repo);
+
+        var result = await controller.Login(
+            new LoginRequest { UserId = "legacy", Password = "wrong" }, CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result.Result);
+        Assert.Empty(repo.UpgradedUserIds);
+    }
+
+    [Fact]
+    public void Verify_against_a_missing_hash_still_burns_the_kdf_cost()
+    {
+        // Guards the generic-401 promise in the timing channel: if the unknown-user path skipped the
+        // dummy PBKDF2, it would return in microseconds while a wrong password costs a full KDF run,
+        // letting an attacker enumerate valid UserIds with a stopwatch. The bound is deliberately far
+        // below the real ~60ms cost (210k iterations) so this can't flake on a fast machine — it only
+        // fails if the decoy is removed entirely, which drops the path to ~0.01ms.
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var result = PasswordHasher.Verify(null, "whatever");
+        sw.Stop();
+
+        Assert.Equal(PasswordVerificationResult.Failed, result);
+        Assert.True(sw.ElapsedMilliseconds >= 10,
+            $"unknown-user path returned in {sw.ElapsedMilliseconds}ms — the dummy-hash decoy is gone, "
+            + "so login now leaks which UserIds exist via response time.");
+    }
+
+    [Fact]
+    public async Task Login_does_not_re_upgrade_a_current_format_hash()
+    {
+        var repo = SeededRepo();
+        var controller = Controller(repo);
+
+        await controller.Login(new LoginRequest { UserId = "helen", Password = "secret" }, CancellationToken.None);
+
+        Assert.Empty(repo.UpgradedUserIds);
     }
 
     [Fact]
@@ -251,7 +346,7 @@ public class AuthControllerTests
 
         Assert.IsType<BadRequestObjectResult>(result);
         var helen = await repo.FindByUserIdAsync("helen");
-        Assert.Equal(PasswordHasher.Sha256Hex("secret"), helen!.PasswordHash); // unchanged
+        Assert.Equal(PasswordVerificationResult.Success, PasswordHasher.Verify(helen!.PasswordHash, "secret")); // unchanged
         Assert.Null(helen.PasswordUpdatedTime);
     }
 
@@ -271,7 +366,8 @@ public class AuthControllerTests
         // Read the anonymous { message } payload directly (JsonSerializer would \u-escape the CJK text).
         var message = bad.Value!.GetType().GetProperty("message")!.GetValue(bad.Value) as string;
         Assert.Equal(PasswordPolicy.ComplexityMessage, message);
-        Assert.Equal(PasswordHasher.Sha256Hex("secret"), (await repo.FindByUserIdAsync("helen"))!.PasswordHash);
+        Assert.Equal(PasswordVerificationResult.Success,
+            PasswordHasher.Verify((await repo.FindByUserIdAsync("helen"))!.PasswordHash, "secret"));
     }
 
     [Theory]
@@ -297,6 +393,7 @@ public class AuthControllerTests
             ChangeReq("secret", "NewPass#1", confirm: "Different#9"), CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Equal(PasswordHasher.Sha256Hex("secret"), (await repo.FindByUserIdAsync("helen"))!.PasswordHash);
+        Assert.Equal(PasswordVerificationResult.Success,
+            PasswordHasher.Verify((await repo.FindByUserIdAsync("helen"))!.PasswordHash, "secret"));
     }
 }

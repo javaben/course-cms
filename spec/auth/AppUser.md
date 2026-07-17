@@ -27,7 +27,8 @@ only changed via a dedicated reset-password endpoint.
 **Special — `PasswordHash` (per `/crud` rules):**
 - Excluded from `AppUserRequest` and **all** Angular models — no form field, no API input, never returned.
 - **CREATE**: read `SysConfig.configValue WHERE configKey='appConfig'` (a JSON object), extract
-  `defaultPassword`, SHA-256 hash it, store as `PasswordHash`; set `PasswordUpdatedTime = UtcNow`.
+  `defaultPassword`, hash it via `PasswordHasher.Hash` (PBKDF2 + fresh salt), store as `PasswordHash`;
+  set `PasswordUpdatedTime = UtcNow`.
 - **UPDATE**: `PasswordHash` / `PasswordUpdatedTime` left untouched.
 - **Reset**: a separate `POST /api/app-users/{id}/reset-password` re-hashes the default password and
   bumps `PasswordUpdatedTime`. This is the *only* update path that touches `PasswordHash`.
@@ -209,7 +210,7 @@ INSERT INTO AppUser (UserId, UserName, IsActive, PasswordHash, PasswordUpdatedTi
 VALUES (@UserId, @UserName, @IsActive, @PasswordHash, @PasswordUpdatedTime);
 ```
 
-- `@PasswordHash` = `Sha256Hex(defaultPassword)` where `defaultPassword` comes from
+- `@PasswordHash` = `PasswordHasher.Hash(defaultPassword)` where `defaultPassword` comes from
   `SysConfig.configValue['appConfig'].defaultPassword` (see below).
 - `@PasswordUpdatedTime` = `DateTime.UtcNow`.
 - No `SCOPE_IDENTITY()` needed for navigation — the PK is the string `UserId` (client already has it);
@@ -246,11 +247,13 @@ var json = await conn.ExecuteScalarAsync<string>(
 // 2. extract defaultPassword (System.Text.Json)
 using var doc = JsonDocument.Parse(json);
 var defaultPassword = doc.RootElement.GetProperty("defaultPassword").GetString()!;
-// 3. SHA-256 → lowercase hex (64 chars, fits nvarchar(800))
-var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(defaultPassword))).ToLowerInvariant();
+// 3. PBKDF2 + fresh random salt → "pbkdf2-sha256$<iter>$<salt>$<key>" (~95 chars, fits nvarchar(800))
+var hash = PasswordHasher.Hash(defaultPassword);
 ```
 
-- **Decision**: store SHA-256 as **lowercase hex**. Documented so the login side can match.
+- **Decision**: hash with `Infrastructure/PasswordHasher.Hash` (PBKDF2-HMAC-SHA256, per-user random
+  salt, 210k iterations). Every call salts afresh, so two users on the default password do **not** share
+  a stored hash. The login side must call `PasswordHasher.Verify` — never compare hashes.
 - If `SysConfig['appConfig']` is missing or has no `defaultPassword`, throw a clear
   `InvalidOperationException` ("appConfig.defaultPassword 未設定") → surfaced as 500 (misconfiguration).
 - A small `IPasswordDefaultProvider` / private helper on the repo encapsulates read+hash so both
@@ -381,6 +384,6 @@ change needed**, the new routes just make it resolve.
 
 ### CLAUDE.md
 - **Modify** — add AppUser to the implemented-features list; note the `SysConfig`-sourced default
-  password + SHA-256(hex) convention and the reset-password endpoint (a new pattern not yet in
+  password + `PasswordHasher.Hash`/`Verify` (PBKDF2, salted) convention and the reset-password endpoint (a new pattern not yet in
   `spec/code-gen.convention.md` — flag the gap).
 </content>

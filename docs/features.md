@@ -21,8 +21,9 @@ A convention **not yet in `spec/code-gen.convention.md`** — flag when generali
 - `PasswordHash` (`nvarchar(800)`) is **backend-only** — excluded from `AppUserRequest`, every
   SELECT, and all Angular models (never sent to or from the client).
 - On **create** the repository reads `SysConfig.configValue WHERE configKey='appConfig'` (a JSON
-  object), extracts `defaultPassword`, SHA-256 hashes it to **lowercase hex**, and stores it (with
-  `PasswordUpdatedTime = UtcNow`).
+  object), extracts `defaultPassword`, hashes it via `PasswordHasher.Hash` (PBKDF2, fresh salt), and
+  stores it (with `PasswordUpdatedTime = UtcNow`). Each call salts afresh, so users sharing the default
+  password do not share a stored hash.
 - **Update** never touches the hash.
 - `POST /api/app-users/{id}/reset-password` re-hashes the default and bumps `PasswordUpdatedTime`.
   **The AppUser *edit form's* reset button now calls the Admin-gated `POST /api/Auth/reset-password`
@@ -43,13 +44,17 @@ Takes `{ userId, password }`, returns `{ userId, userName, accessToken }` (a `Lo
 `[AllowAnonymous]` (per-action, not on the class — see authorization below).
 
 - **Credential check** (`AuthRepository.FindByUserIdAsync`, Dapper): UserId match **and** `IsActive = 1`
-  **and** `PasswordHash == SHA256(password)` as lowercase hex. Any failure returns a single generic
+  **and** `PasswordHasher.Verify(PasswordHash, password) != Failed`. Any failure returns a single generic
   `401 { message: "invalid credentials" }` — the controller evaluates all three then collapses to one
   result so the caller can't tell which failed. `PasswordHash` is read only inside `AuthUser` (a
   server-side credential model) and never serialized — `LoginResponse` has no hash field.
-- **Password hashing** is shared: `Infrastructure/PasswordHasher.Sha256Hex` is the single source of truth,
-  used by both `AuthController` (verify) and `AppUserRepository` (create/reset) so a password set by one
-  verifies under the other.
+- **Password hashing** is shared: `Infrastructure/PasswordHasher` is the single source of truth —
+  `Hash` (PBKDF2-HMAC-SHA256, per-user random salt, 210k iterations) for every write, `Verify`
+  (constant-time) for every check — used by both `AuthController` and `AppUserRepository`, so a password
+  set by one verifies under the other. Hashes are salted, so they are never compared directly. Legacy
+  unsalted-SHA-256 rows still verify and are upgraded in place on their owner's next login (`Verify`
+  returns `SuccessRehashNeeded` → `AuthRepository.UpgradePasswordHashAsync`); nothing writes that format
+  any more.
 - **JWT** (`System.IdentityModel.Tokens.Jwt`, HMAC-SHA256): the signing secret is `SysConfig['appConfig']
   .symmetricSecurityKey`, read at runtime — never hard-coded — via `Infrastructure/SigningKeyProvider`
   (`ISigningKeyProvider`, singleton, caches after first DB read). The **same provider** signs (issue) and
@@ -77,15 +82,16 @@ are unchangeable here. Returns `ProfileResponse { userId, userName }` (canonical
 
 ### Change password (self) — `POST /api/Auth/change-password` (`[Authorize]`)
 
-UserId from the JWT. Order: (1) `SHA256(currentPassword)` must equal the stored hash else `400 目前密碼不正確`;
-(2) `PasswordPolicy.IsComplexEnough(newPassword)` (len ≥ 8 AND ≥ 3 of upper/lower/digit/symbol) else `400`
-with the exact bilingual complexity message; (3) new == confirm else `400`; (4) store `SHA256(new)` + bump
-`PasswordUpdatedTime`, `204`. `ChangePasswordRequest` is all-plaintext; no hash in or out.
+UserId from the JWT. Order: (1) `PasswordHasher.Verify(storedHash, currentPassword)` must not be `Failed`
+else `400 目前密碼不正確`; (2) `PasswordPolicy.IsComplexEnough(newPassword)` (len ≥ 8 AND ≥ 3 of
+upper/lower/digit/symbol) else `400` with the exact bilingual complexity message; (3) new == confirm else
+`400`; (4) store `PasswordHasher.Hash(new)` + bump `PasswordUpdatedTime`, `204`. `ChangePasswordRequest`
+is all-plaintext; no hash in or out.
 
 ### Reset password to default (Admin) — `POST /api/Auth/reset-password` (`[Authorize(Roles="Admin")]`)
 
 **Role-enforced server-side** — a non-Admin authenticated caller gets **403**. Body is just `{ userId }`.
-Reads `appConfig.defaultPassword` at runtime, sets `PasswordHash = SHA256(default)` + `PasswordUpdatedTime`,
+Reads `appConfig.defaultPassword` at runtime, sets `PasswordHash = PasswordHasher.Hash(default)` + `PasswordUpdatedTime`,
 `204` (404 if user missing). The AppUser edit form's reset button (Admin-only, `auth.isAdmin`) calls this;
 the client sends only the UserId. (The older `POST /api/app-users/{id}/reset-password` still exists but the
 form now uses the Admin-gated Auth endpoint.)

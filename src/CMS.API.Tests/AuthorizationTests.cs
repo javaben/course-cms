@@ -265,9 +265,10 @@ public class AuthorizationTests : IDisposable
         Assert.DoesNotContain("hash", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("password", body, StringComparison.OrdinalIgnoreCase);
 
-        // ...and bob's stored hash is now SHA256(default) with a fresh timestamp.
+        // ...and bob's stored hash now verifies against the default, with a fresh timestamp.
         var bob = await AuthRepo().FindByUserIdAsync("bob");
-        Assert.Equal(PasswordHasher.Sha256Hex(InMemoryAuthRepository.DefaultPassword), bob!.PasswordHash);
+        Assert.Equal(PasswordVerificationResult.Success,
+            PasswordHasher.Verify(bob!.PasswordHash, InMemoryAuthRepository.DefaultPassword));
         Assert.NotNull(bob.PasswordUpdatedTime);
     }
 
